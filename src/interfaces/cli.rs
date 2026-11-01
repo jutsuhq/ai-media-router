@@ -866,11 +866,12 @@ fn save_to(collection: Option<String>, reference: Option<String>, role: Option<S
 
 /// Reads the key from a hidden terminal prompt, or all of piped stdin.
 fn read_key(name: &str) -> Result<String> {
-    use std::io::{IsTerminal, Read, Write};
+    use std::io::{IsTerminal, Read};
     let mut stdin = std::io::stdin();
     if stdin.is_terminal() {
         #[cfg(unix)]
         {
+            use std::io::Write;
             eprint!("{name} (input hidden): ");
             std::io::stderr().flush().ok();
             let _ = std::process::Command::new("stty").arg("-echo").status();
