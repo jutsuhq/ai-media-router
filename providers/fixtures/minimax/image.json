@@ -1,0 +1,50 @@
+{
+  "source": "MiniMax image_generation (t2i) docs example response; URLs invented (docs show XXX).",
+  "model": "image-01",
+  "input": {
+    "prompt": "a lighthouse",
+    "aspect_ratio": "16:9",
+    "n": 2
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.minimax.io/v1/image_generation",
+        "body": {
+          "prompt": "a lighthouse",
+          "aspect_ratio": "16:9",
+          "n": 2,
+          "model": "image-01"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "03ff3cd0820949eb8a410056b5f21d38",
+          "data": {
+            "image_urls": [
+              "https://hailuo-image.oss.example/1.jpeg",
+              "https://hailuo-image.oss.example/2.jpeg"
+            ]
+          },
+          "metadata": {
+            "failed_count": "0",
+            "success_count": "2"
+          },
+          "base_resp": {
+            "status_code": 0,
+            "status_msg": "success"
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://hailuo-image.oss.example/1.jpeg",
+      "https://hailuo-image.oss.example/2.jpeg"
+    ]
+  }
+}

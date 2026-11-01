@@ -1,0 +1,53 @@
+key = "piapi"
+name = "PiAPI"
+catalog = ["PiAPI"]
+docs = "https://piapi.ai/docs/unified-api-schema"
+model_hint = "`model` is PiAPI's `model` value from the model's docs page, e.g. `seedance`, `kling` or `Qubico/flux1-dev`. `input` is the rest of the unified task body, merged in as-is: `{\"task_type\": \"seedance-2\", \"input\": {\"prompt\": \"...\", \"image_urls\": [\"https://...\"]}}`."
+base_url = "https://api.piapi.ai"
+notes = """
+Unified task API: POST /api/v1/task with {model, task_type, input}, then
+GET /api/v1/task/{task_id}. `task_type` (and optional `config`, e.g.
+webhook) come from the agent's input object via $merge, because the spec
+has only one model variable.
+Status values (data.status): pending, processing, staged, completed, failed.
+Output shape is model-specific (`data.output`): Kling/Seedance use `video`
+(Kling also repeats it as `video_url` and inside `works[]`; only `video` is
+read to avoid duplicate downloads), Flux uses `image_url`. `image_urls` is
+listed for multi-image models but is not confirmed in the docs; models
+that return media under other keys will finish with no outputs.
+Upload: upload.theapi.app ephemeral_resource (files deleted after 24 h,
+10 MB max, jpg/jpeg/png/webp/mp4/wav/mp3, not available on the Free plan).
+"""
+
+[example]
+model = "seedance"
+input = { task_type = "seedance-2", input = { prompt = "a red fox running through snow", image_urls = ["https://example.com/fox.png"] } }
+
+[auth]
+type = "header"
+env = ["PIAPI_API_KEY"]
+name = "x-api-key"
+
+[errors]
+code = "/code"
+ok = [200]
+message = "/message"
+
+[submit]
+url = "/api/v1/task"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/data/task_id" }
+
+[poll]
+url = "/api/v1/task/{{id}}"
+status = "/data/status"
+success = ["completed"]
+failure = ["failed"]
+error = "/data/error/message"
+outputs = ["/data/output/video", "/data/output/image_url", "/data/output/image_urls"]
+
+[upload]
+type = "json"
+url = "https://upload.theapi.app/api/ephemeral_resource"
+body = { file_name = "{{file_name}}", file_data = "{{data_uri}}" }
+result = "/data/url"

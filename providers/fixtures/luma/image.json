@@ -1,0 +1,67 @@
+{
+  "source": "Luma Agents image generation guide: create example and completed `output` fragment.",
+  "model": "uni-1",
+  "input": {
+    "type": "image",
+    "prompt": "a lighthouse",
+    "aspect_ratio": "16:9"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://agents.lumalabs.ai/v1/generations",
+        "body": {
+          "model": "uni-1",
+          "type": "image",
+          "prompt": "a lighthouse",
+          "aspect_ratio": "16:9"
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "id": "d290f1ee-6c54-4b01-90e6-d701748f0851",
+          "type": "image",
+          "state": "queued",
+          "model": "uni-1",
+          "created_at": "2026-04-08T12:00:00Z",
+          "output": [],
+          "failure_reason": null,
+          "failure_code": null
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://agents.lumalabs.ai/v1/generations/d290f1ee-6c54-4b01-90e6-d701748f0851"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "d290f1ee-6c54-4b01-90e6-d701748f0851",
+          "type": "image",
+          "state": "completed",
+          "model": "uni-1",
+          "created_at": "2026-04-08T12:00:00Z",
+          "output": [
+            {
+              "type": "image",
+              "url": "https://storage.example.com/generations/d290f1ee/output.png?X-Amz-Expires=3600"
+            }
+          ],
+          "failure_reason": null,
+          "failure_code": null
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://storage.example.com/generations/d290f1ee/output.png?X-Amz-Expires=3600"
+    ]
+  }
+}

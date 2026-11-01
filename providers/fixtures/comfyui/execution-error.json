@@ -1,0 +1,49 @@
+{
+  "source": "ComfyUI execution.py handle_execution_error: history status_str error with an execution_error message naming node_type and exception_message. Values invented.",
+  "model": "flux-dev-t2i",
+  "env": { "COMFYUI_URL": "http://127.0.0.1:8188" },
+  "input": {
+    "3": { "class_type": "KSampler", "inputs": { "seed": 1 } }
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": { "method": "POST", "url": "http://127.0.0.1:8188/prompt" },
+      "response": { "status": 200, "body": { "prompt_id": "p-2", "number": 4, "node_errors": {} } }
+    },
+    {
+      "step": "poll",
+      "request": { "method": "GET", "url": "http://127.0.0.1:8188/history/p-2" },
+      "response": {
+        "status": 200,
+        "body": {
+          "p-2": {
+            "outputs": {},
+            "status": {
+              "status_str": "error",
+              "completed": false,
+              "messages": [
+                ["execution_start", { "prompt_id": "p-2", "timestamp": 1761990000000 }],
+                ["execution_error", {
+                  "prompt_id": "p-2",
+                  "node_id": "3",
+                  "node_type": "KSampler",
+                  "executed": ["4", "6"],
+                  "exception_message": "Allocation on device 0 would exceed allowed memory. (out of memory)",
+                  "exception_type": "torch.OutOfMemoryError",
+                  "traceback": ["..."],
+                  "current_inputs": {},
+                  "current_outputs": {}
+                }]
+              ]
+            },
+            "meta": {}
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "error": "KSampler; Allocation on device 0 would exceed allowed memory. (out of memory) — fix: the GPU ran out of memory"
+  }
+}

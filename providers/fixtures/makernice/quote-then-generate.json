@@ -1,0 +1,102 @@
+{
+  "source": "makernice.com/docs: quote returns `id`, create takes quote_id + input, outputs[].url is relative; values invented.",
+  "model": "seedance-2.5",
+  "input": {
+    "mode": "t2v",
+    "prompt": "a red fox running through snow",
+    "duration": 5,
+    "resolution": "720p"
+  },
+  "exchanges": [
+    {
+      "step": "prepare",
+      "request": {
+        "method": "POST",
+        "url": "https://api.makernice.com/v1/generations/quote",
+        "body": {
+          "model": "seedance-2.5",
+          "mode": "t2v",
+          "prompt": "a red fox running through snow",
+          "duration": 5,
+          "resolution": "720p"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "qt_1",
+          "amount": "350000",
+          "price_version": "v1"
+        }
+      }
+    },
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.makernice.com/v1/generations",
+        "headers": {
+          "idempotency-key": "00000000-0000-4000-8000-000000000000"
+        },
+        "body": {
+          "quote_id": "qt_1",
+          "input": {
+            "model": "seedance-2.5",
+            "mode": "t2v",
+            "prompt": "a red fox running through snow",
+            "duration": 5,
+            "resolution": "720p"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "gen_1",
+          "status": "queued"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.makernice.com/v1/generations/gen_1"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "gen_1",
+          "status": "generating"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.makernice.com/v1/generations/gen_1"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "gen_1",
+          "status": "succeeded",
+          "amount": "350000",
+          "outputs": [
+            {
+              "type": "video",
+              "url": "/v1/generations/gen_1/outputs/0"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://api.makernice.com/v1/generations/gen_1/outputs/0"
+    ],
+    "cost": 0.35
+  }
+}

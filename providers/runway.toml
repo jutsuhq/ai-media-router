@@ -1,0 +1,40 @@
+key = "runway"
+name = "Runway"
+catalog = ["Runway"]
+docs = "https://docs.dev.runwayml.com/api/"
+model_hint = "`model` is the Runway generation endpoint name (the path after /v1/), e.g. `image_to_video`, `text_to_video`, `text_to_image`, `video_to_video`. For images use `text_to_image` with e.g. {\"model\": \"gen4_image\", \"promptText\": \"...\", \"ratio\": \"1920:1080\", \"referenceImages\": [{\"uri\": \"https://...\", \"tag\": \"subject\"}]} (other image models: gpt_image_2, gemini_image3_pro, seedream5_pro…). `input` is that endpoint's full JSON body including the Runway model id, e.g. {\"model\": \"veo3.1\", \"promptText\": \"...\", \"promptImage\": \"https://...\", \"ratio\": \"1280:720\", \"duration\": 8}."
+base_url = "https://api.dev.runwayml.com"
+cost_unit = "credits"
+notes = "Runway selects the model in the body, not the URL, and the same model (veo3.1, gen4.5, hailuo3, grok_imagine_1_5, gemini_image3_pro...) is served by several endpoints, so `model` here is the endpoint and the catalog model id travels in `input.model`; price lookup by model id must read input.model. Images/videos are accepted as HTTPS URLs, data URIs (5MB encoded limit for images) or runway:// URIs. Upload: POST /v1/uploads {filename, type: ephemeral} returns a presigned POST form (uploadUrl + fields) and a runwayUri; the file is POSTed to uploadUrl with those fields (`post_form`) and the runway:// URI goes into input. Response field names follow the uploads docs and are unverified; data URIs remain an alternative. Images: text_to_image runs on the same task flow and returns `output` as plain URL strings (expire after 24-48 h); fields depend on the model (body is a union keyed on `model`). Output URLs expire; download promptly. cost is in credits."
+
+[auth]
+type = "bearer"
+env = ["RUNWAYML_API_SECRET"]
+
+[auth_check]
+url = "/v1/organization"
+
+[headers]
+"X-Runway-Version" = "2024-11-06"
+
+[submit]
+url = "/v1/{{model}}"
+body = "{{input}}"
+capture = { id = "/id" }
+
+[poll]
+url = "/v1/tasks/{{id}}"
+status = "/status"
+success = ["SUCCEEDED"]
+failure = ["FAILED", "CANCELLED"]
+error = "/failure"
+cost = "/cost/credits"
+outputs = ["/output"]
+
+[upload]
+type = "post_form"
+url = "/v1/uploads"
+body = { filename = "{{file_name}}", type = "ephemeral" }
+capture = { upload_url = "/uploadUrl", file_url = "/runwayUri" }
+form_fields = "/fields"
+usage = "Put the runway:// URI where the endpoint takes a media URL, e.g. `promptImage` or `videoUri`."

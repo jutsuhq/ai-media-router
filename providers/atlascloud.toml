@@ -1,0 +1,58 @@
+key = "atlascloud"
+name = "Atlas Cloud"
+catalog = ["Atlas Cloud"]
+docs = "https://atlascloud.ai/docs/en/predictions"
+model_hint = "Model id from the model's page at atlascloud.ai/models, e.g. `kwaivgi/kling-v2.6-pro/image-to-video` or `bytedance/seedream-v4.7/text-to-image`. `input` holds that model's other fields (`prompt`, `image`, `duration`…); `model` is added for you. Prefix `video:` (e.g. `video:<model id>`) forces the video endpoint for ids without `video` in them. Prefix `image:` forces generateImage for an id that contains `video` but is an image model."
+base_url = "https://api.atlascloud.ai"
+notes = """
+Atlas has separate submit endpoints for images (generateImage) and video
+(generateVideo) and no generic one. Model ids containing `video`
+(image-to-video, text-to-video, …) route to generateVideo; everything else
+goes to generateImage. Short legacy ids such as `kling-v2.0` or video models
+whose id lacks `video` hit the image endpoint unless prefixed with `video:`.
+Docs disagree on whether `outputs`/`id` sit under `data` or at the top level;
+the per-model examples and predictions page both read `data.id` /
+`data.outputs`, which is used here. Status values from docs: processing,
+completed, succeeded, failed (timeout appears for webhooks).
+Upload response: docs read `url` from the JSON response; unverified whether
+it is top-level or under `data`.
+"""
+
+[example]
+model = "kwaivgi/kling-v2.6-pro/image-to-video"
+input = { prompt = "a red fox running through snow", image = "https://example.com/fox.png", duration = 5 }
+
+[auth]
+type = "bearer"
+env = ["ATLASCLOUD_API_KEY"]
+
+[submit]
+url = "/api/v1/model/generateImage"
+body = { "$merge" = "{{input}}", model = "{{model}}" }
+capture = { id = "/data/id" }
+
+[poll]
+url = "/api/v1/model/prediction/{{id}}"
+status = "/data/status"
+success = ["completed", "succeeded"]
+failure = ["failed", "timeout"]
+error = "/data/error"
+outputs = ["/data/outputs"]
+
+[[route]]
+strip_prefix = "image:"
+models = ["image:*"]
+
+[[route]]
+strip_prefix = "video:"
+models = ["video:*", "*video*"]
+[route.submit]
+url = "/api/v1/model/generateVideo"
+body = { "$merge" = "{{input}}", model = "{{model}}" }
+capture = { id = "/data/id" }
+
+[upload]
+type = "multipart"
+url = "https://api.atlascloud.ai/api/v1/model/uploadMedia"
+file_field = "file"
+result = "/url"

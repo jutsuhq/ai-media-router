@@ -1,0 +1,68 @@
+key = "ai302"
+name = "302.AI"
+catalog = ["302.AI"]
+docs = "https://doc.302.ai/336214131e0.md"
+model_hint = "Video model name accepted by 302.AI's unified V2 video API (list: GET https://api.302.ai/302/v2/model/video), e.g. `minimaxi-t2v-01`; case-insensitive, `-`/`_` interchangeable. `input` is flat: `prompt` plus optional `image` (URL or data URI, string or array), `end_image`, `video` (URL), `negative_prompt`, `duration`, `resolution`, `aspect_ratio`, `fps`. Image models need the `image:` prefix, e.g. `image:flux-kontext-max-t2i` or `image:gpt-image-1` (ids ending in `-t2i` route there without it); `input` is `prompt` plus optional `width`, `height`, `aspect_ratio`, `negative_prompt`, `output_format`, `image` (URL, data URI or array), `mask_image`."
+base_url = "https://api.302.ai"
+notes = """
+Unified V2 video API: POST /302/v2/video/create -> `task_id`, polled at
+GET /302/v2/video/fetch/{task_id}; status pending, processing, completed,
+failed; output `video_url`. Task type is inferred from fields (image ->
+image-to-video, video -> video-to-video).
+The fetch schema defines no failure-reason field, so failures report only the
+status (`raw_response` is undocumented).
+No cost amount in the response (`ai302_cost_request_ids` is only a billing
+request id). Errors are signalled with non-2xx HTTP codes; no body shape is
+documented.
+Images: unified V2 image API, POST /302/v2/image/generate?run_async=true
+-> `task_id`, polled at GET /302/v2/image/fetch/{task_id} (same status values;
+failure text in `error.message`); outputs `image_urls` / `image_url`. Without
+run_async the call is synchronous; async is used so long renders do not hold
+the request open. Image ids share one namespace with video ids and no
+image-model list endpoint is documented (only a static docs page and
+GET /v1/models?llm=0), so images are chosen by the `image:` prefix; only the
+`*-t2i` naming is globbed.
+Upload: POST /302/upload-file (multipart `file`, response `data` = URL; docs
+mention a nominal charge). `image` also accepts data URIs directly.
+Domestic (China) host is https://api.302ai.com.
+"""
+
+[auth]
+type = "bearer"
+env = ["AI302_API_KEY"]
+
+[submit]
+url = "/302/v2/video/create"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/task_id" }
+
+[poll]
+url = "/302/v2/video/fetch/{{id}}"
+status = "/status"
+success = ["completed"]
+failure = ["failed"]
+outputs = ["/video_url"]
+
+[[route]]
+strip_prefix = "video:"
+models = ["video:*"]
+
+[[route]]
+strip_prefix = "image:"
+models = ["image:*", "*-t2i"]
+[route.submit]
+url = "/302/v2/image/generate?run_async=true"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/task_id" }
+[route.poll]
+url = "/302/v2/image/fetch/{{id}}"
+status = "/status"
+success = ["completed"]
+failure = ["failed"]
+error = "/error/message"
+outputs = ["/image_urls", "/image_url"]
+
+[upload]
+type = "multipart"
+url = "https://api.302.ai/302/upload-file"
+result = "/data"

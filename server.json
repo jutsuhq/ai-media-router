@@ -1,0 +1,27 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.jutsuhq/ai-media-router",
+  "title": "AI Media Router",
+  "description": "Image and video generation across 40+ providers with your own keys, plus a local asset library.",
+  "repository": {
+    "url": "https://github.com/jutsuhq/ai-media-router",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/jutsuhq/ai-media-router:v0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        { "name": "KIE_API_KEY", "description": "kie.ai key", "isRequired": false, "isSecret": true },
+        { "name": "FAL_KEY", "description": "fal.ai key", "isRequired": false, "isSecret": true },
+        { "name": "REPLICATE_API_TOKEN", "description": "Replicate token", "isRequired": false, "isSecret": true },
+        { "name": "RUNWARE_API_KEY", "description": "Runware key", "isRequired": false, "isSecret": true },
+        { "name": "WAVESPEED_API_KEY", "description": "WaveSpeed key", "isRequired": false, "isSecret": true }
+      ]
+    }
+  ]
+}

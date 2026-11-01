@@ -1,0 +1,105 @@
+{
+  "source": "Interactions API: GET returns every step incl. the user_input echo; only model_output steps are outputs. Shapes per spec notes, data invented.",
+  "model": "gemini-omni-1.1-flash",
+  "input": {
+    "input": [
+      {
+        "type": "image",
+        "data": "aGk=",
+        "mime_type": "image/png"
+      },
+      {
+        "type": "text",
+        "text": "animate this"
+      }
+    ],
+    "response_format": {
+      "type": "video",
+      "aspect_ratio": "16:9"
+    }
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/interactions",
+        "headers": {
+          "x-goog-api-key": "<GEMINI_API_KEY>",
+          "api-revision": "2026-05-20"
+        },
+        "body": {
+          "input": [
+            {
+              "type": "image",
+              "data": "aGk=",
+              "mime_type": "image/png"
+            },
+            {
+              "type": "text",
+              "text": "animate this"
+            }
+          ],
+          "response_format": {
+            "type": "video",
+            "aspect_ratio": "16:9"
+          },
+          "model": "gemini-omni-1.1-flash",
+          "background": true
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "int_1",
+          "status": "in_progress"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://generativelanguage.googleapis.com/v1beta/interactions/int_1"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "int_1",
+          "status": "completed",
+          "steps": [
+            {
+              "type": "user_input",
+              "content": [
+                {
+                  "type": "image",
+                  "data": "aGk=",
+                  "mime_type": "image/png"
+                },
+                {
+                  "type": "text",
+                  "text": "animate this"
+                }
+              ]
+            },
+            {
+              "type": "model_output",
+              "content": [
+                {
+                  "type": "video",
+                  "data": "AAAAIGZ0eXA=",
+                  "mime_type": "video/mp4"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "inline:video/mp4:8"
+    ]
+  }
+}

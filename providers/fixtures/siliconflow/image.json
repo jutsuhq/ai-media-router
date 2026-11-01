@@ -1,0 +1,41 @@
+{
+  "source": "SiliconFlow /v1/images/generations response schema (images[].url, timings, seed); the docs show no example, values invented.",
+  "model": "Qwen/Qwen-Image",
+  "input": {
+    "prompt": "a lighthouse",
+    "image_size": "1328x1328"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.siliconflow.com/v1/images/generations",
+        "body": {
+          "model": "Qwen/Qwen-Image",
+          "prompt": "a lighthouse",
+          "image_size": "1328x1328"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "images": [
+            {
+              "url": "https://sc-maas.oss-cn-shanghai.aliyuncs.com/outputs/lighthouse.png"
+            }
+          ],
+          "timings": {
+            "inference": 4.2
+          },
+          "seed": 123456
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://sc-maas.oss-cn-shanghai.aliyuncs.com/outputs/lighthouse.png"
+    ]
+  }
+}

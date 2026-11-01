@@ -1,0 +1,58 @@
+key = "pixverse"
+name = "PixVerse (platform API)"
+catalog = ["PixVerse"]
+docs = "https://docs.platform.pixverse.ai/llms.txt"
+model_hint = "Generate path under /openapi/v2/, e.g. `video/img/generate` (image-to-video) or `video/text/generate` (text-to-video). The PixVerse model goes into `input.model` (e.g. `v5`); `input` is the full request body: `model`, `prompt`, `duration`, `quality`, plus `aspect_ratio` (text) or `img_id` (image, from the upload step). Images exist only as templates: `model` = `image/template/generate`, `input` = `{template_id, img_ids: [<upload ids>]}`."
+base_url = "https://app-api.pixverse.ai"
+notes = "Ai-trace-id is a fresh UUID on every request ({{request_uuid}}), as the docs ask. Upload returns an integer `Resp.img_id` (not a URL) that the agent must put into `input.img_id`; `Resp.img_url` also exists but generation endpoints take the id. Poll status: 1 done, 5 generating, 7 moderation failed, 8 failed. Images: only template generation is documented (no text-to-image): POST /openapi/v2/image/template/generate -> `Resp.image_id`, polled at GET /openapi/v2/image/result/{image_id}; output `Resp.url`. The image page documents no status values; 1 = done comes from its example and 7/8 = failed from the video guide (unverified for images)."
+
+[example]
+model = "video/text/generate"
+input = { model = "v5", prompt = "a red fox running through snow", duration = 5, quality = "720p", aspect_ratio = "16:9" }
+
+[auth]
+type = "header"
+env = ["PIXVERSE_API_KEY"]
+name = "API-KEY"
+
+[headers]
+"Ai-trace-id" = "{{request_uuid}}"
+
+[errors]
+code = "/ErrCode"
+ok = [0]
+message = "/ErrMsg"
+
+[submit]
+url = "/openapi/v2/{{model}}"
+body = "{{input}}"
+capture = { id = "/Resp/video_id" }
+
+[poll]
+url = "/openapi/v2/video/result/{{id}}"
+status = "/Resp/status"
+success = [1]
+failure = [7, 8]
+cost = "/Resp/credits"
+outputs = ["/Resp/url"]
+
+[[route]]
+models = ["image/*"]
+[route.submit]
+url = "/openapi/v2/{{model}}"
+body = "{{input}}"
+capture = { id = "/Resp/image_id" }
+[route.poll]
+url = "/openapi/v2/image/result/{{id}}"
+status = "/Resp/status"
+success = [1]
+failure = [7, 8]
+cost = "/Resp/credits"
+outputs = ["/Resp/url"]
+
+[upload]
+type = "multipart"
+url = "/openapi/v2/image/upload"
+file_field = "image"
+result = "/Resp/img_id"
+usage = "Put the integer into `input.img_id` (image-to-video)."

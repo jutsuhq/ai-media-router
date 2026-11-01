@@ -1,0 +1,52 @@
+key = "kling"
+name = "Kling (official API)"
+catalog = ["Kling"]
+docs = "https://kling.ai/document-api/llms.txt"
+model_hint = "Current API: `model` is the path `<task>/<model>`, e.g. `image-to-video/kling-2.6`, `text-to-video/kling-2.6` or `image-to-video/kling-4.0`; `input` is the request body `{contents: [{type: \"text\", text}, {type: \"image\", url}], settings: {resolution, duration, audio}}`. Legacy API (AK/SK keys only): `videos/image2video`, `videos/text2video` or `images/generations` / `images/omni-image` (images; the only image API), with the model in `input.model_name` (e.g. `kling-v3`, `kling-image-o1`) plus `prompt`, `image`, `duration`, `mode` (video) or `prompt`, `resolution` (`1k`, `2k`), `n`, `aspect_ratio` (image)."
+base_url = "https://api-singapore.klingai.com"
+notes = "Two API generations in one spec. Default: the path-versioned API (POST /<task>/<model>, GET /tasks?task_ids=<id>, status submitted/processing/succeeded/failed, outputs in data[0].outputs[].url, billing in data[0].billing[].amount) with Bearer KLING_API_KEY, per the kling.ai 2.6 image-to-video reference; other tasks may use other body fields. Failure text is data[0].message. Legacy design standard (model_name in body, /v1/videos|images/...) is routed by `videos/*` and `images/*` with AK/SK JWT auth, the only auth it accepts; its pages are no longer in the docs index, so its status values (submitted/processing/succeed/failed) and task_result layout come from the earlier reference. Either credential set makes the provider configured; a model whose route needs the other set fails with a message naming it. No upload endpoint: pass public URLs (legacy also takes raw base64 without a data: prefix). Images exist only on the legacy API (the path-versioned API is video-only): `images/generations` (model_name kling-v3, kling-v2-1) and `images/omni-image` (kling-image-o1, kling-v3-omni), both polled at /v1/images/<action>/{id}; outputs task_result.images[].url and, for omni `result_type: series`, task_result.series_images[].url."
+
+[example]
+model = "image-to-video/kling-2.6"
+input = { contents = [{ type = "text", text = "the cat turns its head" }, { type = "image", url = "https://example.com/cat.png" }], settings = { resolution = "1080p", duration = "5" } }
+
+[auth]
+type = "bearer"
+env = ["KLING_API_KEY"]
+
+[errors]
+code = "/code"
+ok = [0]
+message = "/message"
+
+[submit]
+url = "/{{model}}"
+body = "{{input}}"
+capture = { id = "/data/id" }
+
+[poll]
+url = "/tasks?task_ids={{id}}"
+status = "/data/0/status"
+success = ["succeeded"]
+failure = ["failed"]
+error = "/data/0/message"
+cost = "/data/0/billing/0/amount"
+outputs = ["/data/0/outputs"]
+
+[[route]]
+models = ["videos/*", "images/*"]
+[route.auth]
+type = "jwt_hs256"
+env = ["KLING_ACCESS_KEY", "KLING_SECRET_KEY"]
+ttl_secs = 1800
+[route.submit]
+url = "/v1/{{model}}"
+body = "{{input}}"
+capture = { id = "/data/task_id" }
+[route.poll]
+url = "/v1/{{model}}/{{id}}"
+status = "/data/task_status"
+success = ["succeed"]
+failure = ["failed"]
+error = "/data/task_status_msg"
+outputs = ["/data/task_result/videos", "/data/task_result/images", "/data/task_result/series_images"]

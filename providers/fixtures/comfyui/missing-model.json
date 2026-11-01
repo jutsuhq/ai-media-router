@@ -1,0 +1,42 @@
+{
+  "source": "ComfyUI server.py post_prompt: a workflow failing validation is HTTP 400 {error, node_errors}; execution.py value_not_in_list. Values invented.",
+  "model": "sd15-t2i",
+  "env": { "COMFYUI_URL": "http://127.0.0.1:8188" },
+  "input": {
+    "4": { "class_type": "CheckpointLoaderSimple", "inputs": { "ckpt_name": "missing.safetensors" } }
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": { "method": "POST", "url": "http://127.0.0.1:8188/prompt" },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": {
+            "type": "prompt_outputs_failed_validation",
+            "message": "Prompt outputs failed validation",
+            "details": "Value not in list: ckpt_name: 'missing.safetensors' not in ['v1-5-pruned-emaonly.safetensors']",
+            "extra_info": {}
+          },
+          "node_errors": {
+            "4": {
+              "errors": [
+                {
+                  "type": "value_not_in_list",
+                  "message": "Value not in list",
+                  "details": "ckpt_name: 'missing.safetensors' not in ['v1-5-pruned-emaonly.safetensors']",
+                  "extra_info": { "input_name": "ckpt_name", "received_value": "missing.safetensors" }
+                }
+              ],
+              "dependent_outputs": ["9"],
+              "class_type": "CheckpointLoaderSimple"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "error": "HTTP 400: Prompt outputs failed validation; Value not in list: ckpt_name: 'missing.safetensors' not in ['v1-5-pruned-emaonly.safetensors']; CheckpointLoaderSimple — fix: the model or file named in that input is not on this server"
+  }
+}

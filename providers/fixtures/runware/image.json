@@ -1,0 +1,101 @@
+{
+  "source": "Runware imageInference example response and getResponse polling shape; values partly invented.",
+  "model": "image:runware:101@1",
+  "input": {
+    "positivePrompt": "a lighthouse",
+    "width": 1024,
+    "height": 1024
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.runware.ai/v1",
+        "body": [
+          {
+            "taskType": "imageInference",
+            "taskUUID": "00000000-0000-4000-8000-000000000000",
+            "deliveryMethod": "async",
+            "includeCost": true,
+            "model": "runware:101@1",
+            "positivePrompt": "a lighthouse",
+            "width": 1024,
+            "height": 1024
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "data": [
+            {
+              "taskType": "imageInference",
+              "taskUUID": "00000000-0000-4000-8000-000000000000"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "POST",
+        "url": "https://api.runware.ai/v1",
+        "body": [
+          {
+            "taskType": "getResponse",
+            "taskUUID": "00000000-0000-4000-8000-000000000000"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "data": [
+            {
+              "taskType": "imageInference",
+              "taskUUID": "00000000-0000-4000-8000-000000000000",
+              "status": "processing",
+              "progress": 40
+            }
+          ]
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "POST",
+        "url": "https://api.runware.ai/v1",
+        "body": [
+          {
+            "taskType": "getResponse",
+            "taskUUID": "00000000-0000-4000-8000-000000000000"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "data": [
+            {
+              "taskType": "imageInference",
+              "taskUUID": "00000000-0000-4000-8000-000000000000",
+              "status": "success",
+              "imageUUID": "b7db282d-2943-4f12-992f-77df3ad3ec71",
+              "imageURL": "https://im.runware.ai/image/os/a14d18/ws/2/ii/b7db282d.jpg",
+              "cost": 0.0038
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://im.runware.ai/image/os/a14d18/ws/2/ii/b7db282d.jpg"
+    ],
+    "cost": 0.0038
+  }
+}

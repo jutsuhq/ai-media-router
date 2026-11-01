@@ -1,0 +1,99 @@
+key = "cometapi"
+name = "CometAPI"
+catalog = ["CometAPI"]
+docs = "https://apidoc.cometapi.com/api/video/index.md"
+model_hint = "Three forms. (1) Plain video model id for the unified /v1/videos API, e.g. `doubao-seedance-2-0`, `veo3.1-fast`, `happyhorse-1.1`; `input` is flat form fields (`prompt`, `seconds`, `size`, `input_reference` as one HTTPS URL). (2) Kling model route as `<task>/<model>`, e.g. `image-to-video/kling-3.0` or `text-to-video/kling-3.0-turbo`; `input` is the JSON body (`contents`, `settings`, `options`), no `model`. (3) Native Kling path, e.g. `kling/v1/videos/image2video`; `input` is that endpoint's JSON body incl. `model_name` (e.g. `kling-v3`). (4) Image model on the OpenAI-compatible POST /v1/images/generations, e.g. `gpt-image-2` or `doubao-seedream-5-0-260128` (prefix `image:` for other ids); `input` is `prompt`, optional `n`, `size`, `quality`, `output_format`, `response_format` (Seedream/dall-e), `watermark`. Prefix `video:` forces the unified video API."
+base_url = "https://api.cometapi.com"
+notes = """
+Unified /v1/videos (Seedance, HappyHorse, MiniMax H3, Flux 3, Veo 3, Wan,
+Vidu, Omni, Sora): sent as multipart/form-data as the docs say (their Python
+example posts urlencoded `data=`, which the docs call equivalent). An array
+in `input` repeats the field, e.g. several `input_reference` URLs; file parts
+are not sent, so references must be HTTPS URLs. Status queued, in_progress, completed, failed, error;
+output top-level `video_url` (docs: present on completed responses for most
+models; otherwise only via /v1/videos/{id}/content, not wired). No failure
+message field is documented.
+Kling model routes: POST /{task}/{model}, polled at GET /tasks?task_ids={id};
+status submitted, processing, succeeded, failed (listed "such as"); outputs
+`data[0].outputs[].url` (also non-video outputs if returned).
+Native Kling: POST /kling/v1/{action}/{action2}, polled at
+GET /kling/v1/{action}/{action2}/{task_id}; task_status submitted, processing,
+succeed, failed; output `task_result.videos[].url`. Docs say the query may
+return the task without the `data` envelope; only the enveloped form is
+mapped.
+Envelope `code` 0/"success" = accepted on Kling endpoints.
+Images: POST /v1/images/generations is synchronous (do not set `async` or
+`stream`); results are `data[].url` or raw `data[].b64_json` (gpt-image
+always returns base64, with no MIME field: labelled image/png, the gpt-image
+default, so set `output_format` only to png). Routed by gpt-image, dall-e,
+doubao-seedream globs or the `image:` prefix. Gemini (generateContent),
+Midjourney (/mj), FLUX (/flux/v1) and Replicate image routes use separate
+shapes and are not wired.
+No file upload endpoint is documented. Kling `image`/`url` fields take a
+public URL or base64; /v1/videos `input_reference` takes HTTPS URLs; so no
+[upload] - pass public URLs.
+"""
+
+[auth]
+type = "bearer"
+env = ["COMETAPI_API_KEY"]
+
+[errors]
+code = "/code"
+ok = [0, "0", "success"]
+message = "/message"
+
+[submit]
+url = "/v1/videos"
+multipart = true
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/id" }
+
+[poll]
+url = "/v1/videos/{{id}}"
+status = "/status"
+success = ["completed"]
+failure = ["failed", "error"]
+outputs = ["/video_url"]
+
+[[route]]
+strip_prefix = "video:"
+models = ["video:*"]
+
+[[route]]
+strip_prefix = "image:"
+models = ["image:*", "gpt-image-*", "dall-e-*", "doubao-seedream-*"]
+[route.submit]
+url = "/v1/images/generations"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+outputs = ["/data"]
+outputs_base64 = ["/data/*"]
+output_mime = "image/png"
+
+[[route]]
+models = ["text-to-video/*", "image-to-video/*"]
+[route.submit]
+url = "/{{model}}"
+body = "{{input}}"
+capture = { id = "/data/id" }
+[route.poll]
+url = "/tasks?task_ids={{id}}"
+status = "/data/0/status"
+success = ["succeeded"]
+failure = ["failed"]
+error = "/data/0/message"
+outputs = ["/data/0/outputs/*/url"]
+
+[[route]]
+models = ["kling/v1/*"]
+[route.submit]
+url = "/{{model}}"
+body = "{{input}}"
+capture = { id = "/data/task_id" }
+[route.poll]
+url = "/{{model}}/{{id}}"
+status = "/data/task_status"
+success = ["succeed"]
+failure = ["failed"]
+error = "/data/task_status_msg"
+outputs = ["/data/task_result/videos/*/url"]

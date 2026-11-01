@@ -1,0 +1,61 @@
+key = "apimart"
+name = "APIMart"
+catalog = ["APIMart"]
+docs = "https://docs.apimart.ai/_llms/en/api-manual.txt"
+model_hint = "Exact `model` value from the model's generation page in the APIMart API reference, e.g. `kling-v3`, `veo3.1-fast` or `gemini-3-pro-image-preview`. `input` is that page's body without `model`, flat (e.g. `{\"prompt\": \"...\", \"image_urls\": [\"https://...\"], \"duration\": 5}`). Prefix `image:` forces /v1/images/generations for image ids the route globs miss; `video:` forces /v1/videos/generations."
+base_url = "https://api.apimart.ai"
+notes = """
+Video models POST /v1/videos/generations, image models POST
+/v1/images/generations (route by model glob: gpt-image, gemini *-image-preview
+and nano-banana aliases, seedream); both return `data[0].task_id`, polled at
+GET /v1/tasks/{id} (`language=en` localizes `error.message`).
+Success envelope is `{code: 200, data}`; HTTP errors are non-2xx with
+`error.{code,message,type}`. Status values: pending, processing, completed,
+failed, cancelled.
+Outputs: images at `result.images[].url` (the docs show `url` as an array for
+multi-image models); `result.videos` object fields are not shown in the docs,
+the `url` key is assumed by analogy with images - unverified.
+Cost: `data.cost` (unit not stated; `credits_cost` is the credit amount).
+Upload: POST /v1/uploads/images (multipart `file`, images only, 20 MB, URL
+valid 72 h). Base64 is no longer accepted by generation APIs (except data URIs
+in some image models' `image_urls`), so references go through the upload.
+"""
+
+[auth]
+type = "bearer"
+env = ["APIMART_API_KEY"]
+
+[errors]
+code = "/code"
+ok = [200]
+
+[submit]
+url = "/v1/videos/generations"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/data/0/task_id" }
+
+[poll]
+url = "/v1/tasks/{{id}}?language=en"
+status = "/data/status"
+success = ["completed"]
+failure = ["failed", "cancelled"]
+error = "/data/error/message"
+cost = "/data/cost"
+outputs = ["/data/result/videos/*/url", "/data/result/images/*/url"]
+
+[[route]]
+strip_prefix = "video:"
+models = ["video:*"]
+
+[[route]]
+strip_prefix = "image:"
+models = ["image:*", "gpt-image-*", "gemini-*-image-preview*", "nano-banana*", "seedream-*", "Seedream-*"]
+[route.submit]
+url = "/v1/images/generations"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/data/0/task_id" }
+
+[upload]
+type = "multipart"
+url = "https://api.apimart.ai/v1/uploads/images"
+result = "/url"

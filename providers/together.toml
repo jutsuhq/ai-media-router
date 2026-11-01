@@ -1,0 +1,75 @@
+key = "together"
+name = "Together AI"
+catalog = ["Together", "Together AI"]
+docs = "https://docs.together.ai/docs/videos-overview"
+model_hint = "Together model API string from docs.together.ai/docs/serverless-models, e.g. `minimax/hailuo-02` or `ByteDance/Seedance-2.0` (video) or `black-forest-labs/FLUX.2-pro` (image). `input` holds the remaining body fields of POST /v2/videos (e.g. `{\"prompt\": \"...\", \"seconds\": \"5\", \"media\": {\"frame_images\": [{\"input_image\": \"https://...\"}]}}`) or of POST /v1/images/generations for image models (e.g. `{\"prompt\": \"...\", \"width\": 1024, \"height\": 1024}`). Prefix `image:` (e.g. `image:<model id>`) forces the image endpoint for ids the route globs miss; `video:` forces the video endpoint for ids a glob catches wrongly."
+base_url = "https://api.together.ai"
+notes = """
+Video: POST /v2/videos returns a VideoJob; GET /v2/videos/{id} is polled.
+Status values from the docs: queued, in_progress, completed, failed,
+cancelled. On failure `error.message` is set; `outputs.cost` is an integer
+in the provider's own unit. Video URLs expire, download promptly.
+Images: POST /v1/images/generations is synchronous (`data[].url`), so image
+models go through a route whose submit has outputs and no poll. The route
+is chosen by model-id globs taken from the serverless model list; image
+models added later need a glob here, otherwise they are sent to /v2/videos
+unless the agent prefixes the id with `image:`.
+Note `black-forest-labs/FLUX-3` is a video model, while `FLUX.` (dot) ids
+are image models. `response_format` is sent as `url`; an agent may set `base64`, whose
+`data[].b64_json` is read too, labelled image/jpeg (the default
+`output_format`; the response has no MIME field, so with `output_format: png`
+the file is mislabelled).
+Upload: Together documents no media upload endpoint and only URL inputs
+(`media.*`, `image_url`, `reference_images`), so references must be public
+URLs supplied by the agent.
+"""
+
+[auth]
+type = "bearer"
+env = ["TOGETHER_API_KEY"]
+
+[auth_check]
+url = "/v1/models"
+
+[submit]
+url = "/v2/videos"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/id" }
+
+[poll]
+url = "/v2/videos/{{id}}"
+status = "/status"
+success = ["completed"]
+failure = ["failed", "cancelled"]
+error = "/error/message"
+cost = "/outputs/cost"
+outputs = ["/outputs/video_url"]
+
+[[route]]
+strip_prefix = "video:"
+models = ["video:*"]
+
+[[route]]
+strip_prefix = "image:"
+models = [
+  "image:*",
+  "black-forest-labs/FLUX.*",
+  "ByteDance-Seed/Seedream-*",
+  "ByteDance/Seedream-*",
+  "google/flash-image-*",
+  "google/gemini-*-image",
+  "ideogram/*",
+  "openai/gpt-image-*",
+  "prunaai/*",
+  "Qwen/Qwen-Image*",
+  "Rundiffusion/*",
+  "RunDiffusion/*",
+  "stabilityai/*",
+  "Wan-AI/*-image",
+]
+[route.submit]
+url = "/v1/images/generations"
+body = { model = "{{model}}", response_format = "url", "$merge" = "{{input}}" }
+outputs = ["/data"]
+outputs_base64 = ["/data/*"]
+output_mime = "image/jpeg"

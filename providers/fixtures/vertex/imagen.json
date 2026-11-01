@@ -1,0 +1,59 @@
+{
+  "source": "Vertex AI Imagen generate-images docs example response (base64 shortened to 'hi').",
+  "model": "imagen-4.0-generate-001",
+  "input": {
+    "instances": [
+      {
+        "prompt": "a lighthouse"
+      }
+    ],
+    "parameters": {
+      "sampleCount": 2
+    }
+  },
+  "env": {
+    "GOOGLE_CLOUD_LOCATION": "us-central1",
+    "GOOGLE_CLOUD_PROJECT": "demo-project",
+    "GOOGLE_ACCESS_TOKEN": "t"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://us-central1-aiplatform.googleapis.com/v1/projects/demo-project/locations/us-central1/publishers/google/models/imagen-4.0-generate-001:predict",
+        "body": {
+          "instances": [
+            {
+              "prompt": "a lighthouse"
+            }
+          ],
+          "parameters": {
+            "sampleCount": 2
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "predictions": [
+            {
+              "bytesBase64Encoded": "aGk=",
+              "mimeType": "image/png"
+            },
+            {
+              "mimeType": "image/jpeg",
+              "bytesBase64Encoded": "aGk="
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "inline:image/png:2",
+      "inline:image/jpeg:2"
+    ]
+  }
+}

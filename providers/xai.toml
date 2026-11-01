@@ -1,0 +1,63 @@
+key = "xai"
+name = "xAI (Grok Imagine)"
+catalog = ["xAI"]
+docs = "https://docs.x.ai/developers/rest-api-reference/inference/videos"
+model_hint = "xAI model id, e.g. `grok-imagine-video-1.5` (video) or `grok-imagine-image-2.0` (image). `input` holds the remaining body fields: for video `{\"prompt\": \"...\", \"duration\": 8, \"image\": {\"url\": \"https://...\"}}` (also `reference_images`, `aspect_ratio`, `resolution`), for image `{\"prompt\": \"...\", \"resolution\": \"1k\"}`. Prefix `image:` (e.g. `image:<model id>`) forces the image endpoint for ids the route globs miss; `video:` forces the video endpoint for ids a glob catches wrongly."
+base_url = "https://api.x.ai"
+cost_unit = "USD"
+cost_multiplier = 1e-10
+notes = """
+Video: POST /v1/videos/generations returns `request_id`; GET
+/v1/videos/{request_id} is polled. The reference documents `pending` and
+`done` for `status` and `progress` describes a `failed` state; the video
+guide also checks `expired`. Output at `video.url` (temporary URL).
+`usage.cost_in_usd_ticks` is reported as cost, scaled to USD by cost_multiplier
+(1 USD cent = 100,000,000 ticks).
+Images: POST /v1/images/generations is synchronous (`data[].url`), routed
+by the `grok-imagine-image*` glob. `response_format` is sent as `url`; if an
+agent sets `b64_json`, `data[].b64_json` is read, typed by `data[].mime_type`.
+Deferred image mode (`deferred: true`, GET /v1/images/{id}) is not used. Image editing
+(POST /v1/images/edits), video edit (/v1/videos/edits) and extension
+(/v1/videos/extensions) are separate endpoints not covered here.
+Upload: image/video inputs accept public URLs or base64 data URLs, so local
+references go in as data URIs. The xAI Files API (`file_id`) is not used.
+"""
+
+[auth]
+type = "bearer"
+env = ["XAI_API_KEY"]
+
+[auth_check]
+url = "/v1/api-key"
+
+[submit]
+url = "/v1/videos/generations"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/request_id" }
+
+[poll]
+url = "/v1/videos/{{id}}"
+status = "/status"
+success = ["done"]
+failure = ["failed", "expired"]
+error = "/error/message"
+cost = "/usage/cost_in_usd_ticks"
+outputs = ["/video/url"]
+
+[[route]]
+strip_prefix = "video:"
+models = ["video:*"]
+
+[[route]]
+strip_prefix = "image:"
+models = ["image:*", "grok-imagine-image*"]
+[route.submit]
+url = "/v1/images/generations"
+body = { model = "{{model}}", response_format = "url", "$merge" = "{{input}}" }
+cost = "/usage/cost_in_usd_ticks"
+outputs = ["/data"]
+outputs_base64 = ["/data/*"]
+output_mime = "image/png"
+
+[upload]
+type = "data_uri"

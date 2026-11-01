@@ -1,0 +1,39 @@
+key = "runware"
+name = "Runware"
+catalog = ["Runware"]
+docs = "https://runware.ai/docs/video-inference/introduction"
+model_hint = "Runware AIR model id from the model's docs page, e.g. `klingai:kling-video@3-pro`. `input` is the rest of the videoInference task object: `positivePrompt`, `duration`, optional `width`/`height`, and for image-to-video `inputs.frameImages` (array of image URLs, data URIs, base64 or Runware UUIDs, or `{image, frame}` objects with frame `first`/`last`). Images: prefix the AIR id with `image:` (e.g. `image:runware:101@1`); `input` is the rest of the imageInference task: `positivePrompt`, `width`, `height`, optional `numberResults`, `outputFormat`, `seed`, `steps`, `CFGScale`."
+base_url = "https://api.runware.ai"
+notes = "Flow: POST /v1 with one videoInference task (deliveryMethod async, client-generated taskUUID) -> POST /v1 with a getResponse task until data[0].status is success. Status is not used as the poll pointer on purpose: failures arrive in the `errors` array (status `error`) and `data` may then be empty, so poll success = videoURL/imageURL found, failure = errors[0].message found. Images: the `image:` route sends an imageInference task through the same async getResponse flow (outputs data[].imageURL; keep `outputType` at its default `URL`). AIR ids do not tell image from video models, hence the prefix. Whether submit-time validation errors come as non-2xx or as a 2xx `errors` array is not documented."
+
+[example]
+model = "klingai:kling-video@3-pro"
+input = { positivePrompt = "a red fox running through snow", duration = 5, inputs = { frameImages = ["https://example.com/fox.png"] } }
+
+[auth]
+type = "bearer"
+env = ["RUNWARE_API_KEY"]
+
+[submit]
+url = "/v1"
+body = [{ taskType = "videoInference", taskUUID = "{{uuid}}", deliveryMethod = "async", includeCost = true, model = "{{model}}", "$merge" = "{{input}}" }]
+capture = { id = "/data/0/taskUUID" }
+
+[poll]
+method = "POST"
+url = "/v1"
+body = [{ taskType = "getResponse", taskUUID = "{{id}}" }]
+error = "/errors/0/message"
+cost = "/data/0/cost"
+outputs = ["/data/*/videoURL", "/data/*/imageURL"]
+
+[[route]]
+strip_prefix = "image:"
+models = ["image:*"]
+[route.submit]
+url = "/v1"
+body = [{ taskType = "imageInference", taskUUID = "{{uuid}}", deliveryMethod = "async", includeCost = true, model = "{{model}}", "$merge" = "{{input}}" }]
+capture = { id = "/data/0/taskUUID" }
+
+[upload]
+type = "data_uri"

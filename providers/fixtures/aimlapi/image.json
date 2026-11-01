@@ -1,0 +1,35 @@
+{
+  "source": "Response shape as documented in this spec's notes (from the provider docs); values invented.",
+  "model": "flux/schnell",
+  "input": {
+    "prompt": "a lighthouse"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.aimlapi.com/v1/images/generations",
+        "body": {
+          "model": "flux/schnell",
+          "prompt": "a lighthouse"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "data": [
+            {
+              "url": "https://cdn.aimlapi.com/lighthouse.png"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://cdn.aimlapi.com/lighthouse.png"
+    ]
+  }
+}

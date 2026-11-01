@@ -1,0 +1,37 @@
+name: Provider broken / API changed
+description: A provider or model fails because its API, prices or response shape changed.
+labels: [provider]
+body:
+  - type: input
+    id: provider
+    attributes:
+      label: Provider and model
+      placeholder: fal / kling-v3-pro
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `ai-media-router --version`, or the commit you built.
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Error
+      description: The full error, including the step and spec pointer it names.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: What changed upstream
+      description: Link to the provider's docs or changelog, and a redacted request/response if you have one. Never paste API keys.
+  - type: checkboxes
+    id: spec
+    attributes:
+      label: Spec fix
+      options:
+        - label: I can send a PR with the updated `providers/<name>.toml` and fixtures (see docs/provider-spec.md).

@@ -1,0 +1,39 @@
+{
+  "source": "Vercel AI Gateway /v1/images/generations (OpenAI-compatible, b64_json only); the docs show no example, values invented.",
+  "model": "openai/gpt-image-2",
+  "input": {
+    "prompt": "a lighthouse",
+    "size": "1024x1024"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://ai-gateway.vercel.sh/v1/images/generations",
+        "body": {
+          "model": "openai/gpt-image-2",
+          "response_format": "b64_json",
+          "prompt": "a lighthouse",
+          "size": "1024x1024"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "created": 1781075000,
+          "data": [
+            {
+              "b64_json": "aGk="
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "inline:image/png:2"
+    ]
+  }
+}

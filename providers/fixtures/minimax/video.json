@@ -1,0 +1,100 @@
+{
+  "source": "MiniMax video generation docs: example responses of video_generation, query and files/retrieve; ids invented.",
+  "model": "MiniMax-Hailuo-02",
+  "input": {
+    "prompt": "a lighthouse in a storm",
+    "duration": 6
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.minimax.io/v1/video_generation",
+        "body": {
+          "model": "MiniMax-Hailuo-02",
+          "prompt": "a lighthouse in a storm",
+          "duration": 6
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task_id": "106916112212032",
+          "base_resp": {
+            "status_code": 0,
+            "status_msg": "success"
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.minimax.io/v1/query/video_generation?task_id=106916112212032"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task_id": "106916112212032",
+          "status": "Processing",
+          "file_id": "",
+          "base_resp": {
+            "status_code": 0,
+            "status_msg": "success"
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.minimax.io/v1/query/video_generation?task_id=106916112212032"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task_id": "106916112212032",
+          "status": "Success",
+          "file_id": "205258526306433",
+          "video_width": 1366,
+          "video_height": 768,
+          "base_resp": {
+            "status_code": 0,
+            "status_msg": "success"
+          }
+        }
+      }
+    },
+    {
+      "step": "result",
+      "request": {
+        "method": "GET",
+        "url": "https://api.minimax.io/v1/files/retrieve?file_id=205258526306433"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "file": {
+            "file_id": 205258526306433,
+            "bytes": 5896337,
+            "filename": "output.mp4",
+            "purpose": "video_generation",
+            "download_url": "https://public-cdn-video-data.oss.example.com/output.mp4"
+          },
+          "base_resp": {
+            "status_code": 0,
+            "status_msg": "success"
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://public-cdn-video-data.oss.example.com/output.mp4"
+    ]
+  }
+}

@@ -1,0 +1,46 @@
+key = "volcengine"
+name = "Volcengine Ark (China)"
+catalog = ["Volcengine"]
+docs = "https://docs.volcengine.com/docs/82379/1520757"
+model_hint = "`model` is an Ark Model ID or your Endpoint ID, e.g. `doubao-seedance-1-0-pro-250528` (video) or `doubao-seedream-5-0-pro-260628` (image; any id containing `seedream`, or prefix `image:`; `video:` forces the video endpoint). For Seedance, `input` holds the request fields besides `model`: `content` (array of `{type:\"text\",text}`, `{type:\"image_url\",image_url:{url},role:\"first_frame\"|\"last_frame\"|\"reference_image\"}`, `video_url`/`audio_url` items) plus top-level `ratio`, `duration`, `resolution`, `generate_audio`, `seed`, `watermark`; for Seedream, `input` is `{prompt, image?, size?, watermark?}`."
+base_url = "https://ark.cn-beijing.volces.com/api/v3"
+cost_unit = "tokens"
+notes = "Seedream (/images/generations) is synchronous and returns `data[].url`; keep `response_format` at its default `url` since `b64_json` output carries no MIME field and is not mapped; do not set `stream`. `cost` is `usage.completion_tokens` (tokens, not money). Video and last-frame URLs expire after 24 h. Data URIs are documented for `image_url` only; video/audio references need public URLs or `asset://` ids."
+
+[example]
+model = "doubao-seedance-1-0-pro-250528"
+input = { content = [{ type = "text", text = "a red fox running through snow" }, { type = "image_url", image_url = { url = "https://example.com/fox.png" }, role = "first_frame" }], ratio = "16:9", duration = 5, resolution = "720p" }
+
+[auth]
+type = "bearer"
+env = ["ARK_API_KEY"]
+
+[submit]
+url = "/contents/generations/tasks"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/id" }
+
+[poll]
+url = "/contents/generations/tasks/{{id}}"
+status = "/status"
+success = ["succeeded"]
+failure = ["failed", "cancelled", "expired"]
+error = "/error/message"
+cost = "/usage/completion_tokens"
+outputs = ["/content/video_url"]
+
+[upload]
+type = "data_uri"
+
+[[route]]
+strip_prefix = "video:"
+models = ["video:*"]
+
+[[route]]
+strip_prefix = "image:"
+models = ["image:*", "*seedream*"]
+[route.submit]
+url = "/images/generations"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+cost = "/usage/output_tokens"
+outputs = ["/data/*/url"]

@@ -1,0 +1,82 @@
+key = "yir"
+name = "Yir"
+catalog = ["Yir"]
+docs = "https://yir.ai/docs/reference"
+model_hint = "Yir canonical model id from yir.ai/docs/models, e.g. `bytedance/seedance-2.0` (video) or `openai/gpt-image-2` (image). `input` holds the rest of the Standard API body: `{\"input\": {\"type\": \"text\", \"prompt\": \"...\"}, \"parameters\": {\"duration\": 5, \"resolution\": \"720p\", \"aspect_ratio\": \"16:9\", \"n\": 1}}`; references go in `input.references` as `{\"role\": \"first_frame\", \"url\": \"https://...\"}`. Prefix `image:` (e.g. `image:<model id>`) forces the image endpoint for ids the route globs miss; `video:` forces the video endpoint for ids a glob catches wrongly."
+base_url = "https://gateway.yir.ai"
+cost_unit = "USD"
+notes = """
+Standard Async API: POST /v1/videos/generations or /v1/images/generations
+returns a Job (`id`); GET /v1/jobs/{id} returns the full Job. States:
+queued, running, delivering, succeeded, failed, cancelled. Results in
+`result.files[].url` (signed, short-lived, no auth needed). Error shape
+`error.code` / `error.message`. Cost: `billing.total_charged_by_yir` (USD).
+Every generation request needs an `Idempotency-Key` header: the per-job
+`{{uuid}}`, sent on submit only. The docs suggest the
+lighter /v1/jobs/{id}/status for polling, but it lacks `result`, so the full
+Job endpoint is polled instead of adding a result step.
+Image models are routed by globs built from the model catalog; video is the
+default. Audio (/v1/audio/generations) and 3D (/v1/3d/generations) models are
+not routed. New image ids that miss the globs go to the video endpoint unless prefixed
+with `image:`.
+Upload: generation endpoints reject base64/data URLs, so the Files API is
+used: POST /v1/files {files: [{name, media_type, size}]} -> PUT
+files[0].upload.parts[0].url -> POST /v1/files/{id}/complete {} -> file id.
+Single-part uploads only (fine for references). After completion the file is
+`processing` until `ready`, and the docs say to wait for ready; AI Media Router
+does not wait, so a job submitted immediately may be rejected. How a file id
+is referenced in generation input is not documented on the files pages.
+"""
+
+[auth]
+type = "bearer"
+env = ["YIR_API_KEY"]
+
+[submit]
+url = "/v1/videos/generations"
+headers = { "Idempotency-Key" = "{{uuid}}" }
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/id" }
+
+[poll]
+url = "/v1/jobs/{{id}}"
+status = "/status"
+success = ["succeeded"]
+failure = ["failed", "cancelled"]
+error = "/error/message"
+cost = "/billing/total_charged_by_yir"
+outputs = ["/result/files"]
+
+[[route]]
+strip_prefix = "video:"
+models = ["video:*"]
+
+[[route]]
+strip_prefix = "image:"
+models = [
+  "image:*",
+  "*image*",
+  "bfl/flux-2-*",
+  "bfl/flux-kontext-*",
+  "bfl/flux-pro-*",
+  "bytedance/seedream-*",
+  "google/nano-banana-*",
+  "midjourney/*",
+  "prodia/*",
+  "recraft/*",
+  "reve/*",
+]
+[route.submit]
+url = "/v1/images/generations"
+headers = { "Idempotency-Key" = "{{uuid}}" }
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/id" }
+
+[upload]
+type = "put"
+url = "/v1/files"
+body = { files = [{ name = "{{file_name}}", media_type = "{{mime}}", size = "{{size_bytes}}" }] }
+capture = { upload_url = "/files/0/upload/parts/0/url", file_id = "/files/0/id" }
+complete = { url = "/v1/files/{{file_id}}/complete", body = {} }
+result = "/id"
+usage = "A Yir file id (`file_…`); the generation docs do not say which field takes it (likely an `input.references` entry). Wait a few seconds after upload: files must reach `ready`."

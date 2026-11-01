@@ -1,0 +1,72 @@
+{
+  "source": "Legacy Kling API (task_status / task_result layout from the earlier reference); routed by videos/* with JWT auth.",
+  "model": "videos/image2video",
+  "input": {
+    "model_name": "kling-v2-1",
+    "image": "https://example.com/cat.png",
+    "prompt": "the cat turns its head",
+    "duration": "5"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api-singapore.klingai.com/v1/videos/image2video",
+        "headers": {
+          "authorization": "Bearer <JWT iss=<KLING_ACCESS_KEY> signed with <KLING_SECRET_KEY>>"
+        },
+        "body": {
+          "model_name": "kling-v2-1",
+          "image": "https://example.com/cat.png",
+          "prompt": "the cat turns its head",
+          "duration": "5"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "message": "SUCCEED",
+          "request_id": "r1",
+          "data": {
+            "task_id": "CjhH1",
+            "task_status": "submitted"
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api-singapore.klingai.com/v1/videos/image2video/CjhH1"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "message": "SUCCEED",
+          "data": {
+            "task_id": "CjhH1",
+            "task_status": "succeed",
+            "task_result": {
+              "videos": [
+                {
+                  "id": "v1",
+                  "url": "https://cdn.klingai.com/legacy.mp4",
+                  "duration": "5"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://cdn.klingai.com/legacy.mp4"
+    ]
+  }
+}

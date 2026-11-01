@@ -1,0 +1,51 @@
+key = "novita"
+name = "Novita AI"
+catalog = ["Novita", "Novita AI"]
+docs = "https://docs.novita.ai/api-reference/model-apis-task-result"
+model_hint = "`model` is the v3 async endpoint name from the model's page on novita.ai/models, e.g. `kling-v3.0-std-i2v` (POST /v3/async/kling-v3.0-std-i2v); `input` is that endpoint's JSON body (e.g. `{\"image\": \"…\", \"prompt\": \"…\"}`). For MiniMax H3 pass `MiniMax-H3` or `MiniMax-H3-Max` and an input like `{\"content\": [{\"type\": \"text\", \"text\": \"…\"}], \"resolution\": \"768P\", \"duration\": 4, \"ratio\": \"16:9\"}`."
+base_url = "https://api.novita.ai"
+notes = """
+Generic path: POST /v3/async/<endpoint> returns `task_id`; results come from
+GET /v3/async/task-result?task_id= (task.status TASK_STATUS_QUEUED |
+PROCESSING | SUCCEED | FAILED, failure text in task.reason, media in
+videos[].video_url / images[].image_url with a TTL).
+MiniMax H3 uses its own native protocol (/v3/minimax-en/v2/...), routed by
+model id. Its docs write the host as `{api_domain}`; api.novita.ai is assumed.
+Per-model endpoint references were removed from docs.novita.ai; endpoint
+names are on the novita.ai/models pages. Most older video models (Wan, Hailuo
+2.3, Seedance, Kling <= 2.6, Vidu) were retired during Jul-Sep 2026.
+No upload endpoint for media. MiniMax H3 accepts data URIs in
+content[].image_url.url; for /v3/async models the docs do not say whether
+`image` takes a URL or base64, so no [upload] is declared.
+"""
+
+[auth]
+type = "bearer"
+env = ["NOVITA_API_KEY"]
+
+[submit]
+url = "/v3/async/{{model}}"
+body = "{{input}}"
+capture = { id = "/task_id" }
+
+[poll]
+url = "/v3/async/task-result?task_id={{id}}"
+status = "/task/status"
+success = ["TASK_STATUS_SUCCEED"]
+failure = ["TASK_STATUS_FAILED"]
+error = "/task/reason"
+outputs = ["/videos/*/video_url", "/images/*/image_url"]
+
+[[route]]
+models = ["MiniMax-H3*"]
+[route.submit]
+url = "/v3/minimax-en/v2/video_generation"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/task_id" }
+[route.poll]
+url = "/v3/minimax-en/v2/query/video_generation/{{id}}"
+status = "/task/status"
+success = ["succeeded"]
+failure = ["failed", "cancelled"]
+error = "/task/error/message"
+outputs = ["/task/content/url"]

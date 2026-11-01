@@ -1,0 +1,64 @@
+key = "modelslab"
+name = "ModelsLab"
+catalog = ["ModelsLab"]
+docs = "https://modelslab.com/ai-video-api"
+model_hint = "`model` is the v7 video-fusion endpoint name: `text-to-video`, `image-to-video` or `video-to-video`. `input` is that endpoint's body including the ModelsLab model id, e.g. `{\"model_id\": \"seedance-2-text-to-video\", \"prompt\": \"…\", \"duration\": 5, \"aspect_ratio\": \"16:9\"}`; image-to-video takes `init_image` as an array of image URLs. Images: `model` = `images/text2img` (POST /api/v6/images/text2img), `input` = `{\"model_id\": \"flux\", \"prompt\": \"…\", \"width\": 1024, \"height\": 1024, \"samples\": 1}`."
+base_url = "https://modelslab.com"
+notes = """
+Uses the current v7 video-fusion API (key in the `key` header), documented on
+modelslab.com/ai-video-api and modelslab.com/video-fusion/text-to-video; the
+docs.modelslab.com reference still describes the older v6 /api/v6/video/*
+endpoints with the key in the body.
+The v7 pages do not document the response schema beyond `id` and `output`
+(array, first item is the video URL, filled only when done; short renders
+return it from submit directly). Poll therefore has no `status`: success =
+outputs found. Failures are caught by [errors] using the v6 schema
+(`status` = success | processing | error, `message`); a v7 failure without
+`status: "error"` would only end by timeout.
+Images: v6 POST /api/v6/{images/...} (key in the body, as the v6 reference
+documents; the v7 images path appears only in a guide, without a reference)
+returns `output[]` URLs, or `status: processing` with `id`, polled with
+POST /api/v6/images/fetch {key, request_id}.
+Upload: v6 POST /api/v6/base64_to_url (key in body, data URI in
+`base64_string`), returns URLs in `output`, valid 24 h, max 5 MB.
+"""
+
+[auth]
+type = "header"
+env = ["MODELSLAB_API_KEY"]
+name = "key"
+
+[errors]
+code = "/status"
+ok = ["success", "processing"]
+message = "/message"
+
+[submit]
+url = "/api/v7/video-fusion/{{model}}"
+body = "{{input}}"
+capture = { id = "/id" }
+outputs = ["/output"]
+
+[poll]
+method = "POST"
+url = "/api/v7/video-fusion/fetch/{{id}}"
+outputs = ["/output"]
+
+[[route]]
+models = ["images/*"]
+[route.submit]
+url = "/api/v6/{{model}}"
+body = { key = "{{env.MODELSLAB_API_KEY}}", "$merge" = "{{input}}" }
+capture = { id = "/id" }
+outputs = ["/output"]
+[route.poll]
+method = "POST"
+url = "/api/v6/images/fetch"
+body = { key = "{{env.MODELSLAB_API_KEY}}", request_id = "{{id}}" }
+outputs = ["/output"]
+
+[upload]
+type = "json"
+url = "https://modelslab.com/api/v6/base64_to_url"
+body = { key = "{{env.MODELSLAB_API_KEY}}", base64_string = "{{data_uri}}" }
+result = "/output/0"

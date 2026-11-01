@@ -1,0 +1,47 @@
+name: Bug report
+description: Something in the router itself does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: If a single provider started failing after it changed its API, use **Provider broken / API changed** instead.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `ai-media-router --version`, or the commit you built.
+    validations:
+      required: true
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      options: [MCP over stdio, MCP over HTTP (serve), REST /v1, CLI, Docker]
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS and architecture
+      placeholder: macOS 15 arm64
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did
+      description: The tool call, request or command, with arguments. Remove API keys.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: What happened and what you expected
+      description: Include the full error text. Errors name the provider, step and spec pointer.
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Doctor output
+      description: Output of `ai-media-router doctor`, if relevant.
+      render: text

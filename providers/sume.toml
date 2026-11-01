@@ -1,0 +1,72 @@
+key = "sume"
+name = "Sume"
+catalog = ["Sume"]
+docs = "https://www.sume.com/docs/models"
+model_hint = "`model` is a Sume model id from the docs models page (or GET /v1/video-router/models, /v1/image-router/models), e.g. `seedance-2.5` or `kling-3` for video, `gpt-image-2` for images. `input` is the rest of the router request body, merged in as-is (e.g. `{\"prompt\": \"...\", \"image_url\": \"https://...\"}` for video, `{\"prompt\": \"...\", \"image_urls\": [\"https://...\"]}` for images). Prefix `image:` (e.g. `image:<model id>`) forces the image endpoint for ids the route globs miss; `video:` forces the video endpoint for ids a glob catches wrongly."
+base_url = "https://api.sume.com"
+notes = """
+Two routers: POST /v1/video-router/generate (video, lip-sync, captions)
+and POST /v1/image-router/generate (images); image model ids are matched
+by the route globs below (list from docs on 2026-10-31), everything else
+goes to the video router. Jobs are async by default (`mode: async`).
+Poll GET /v1/jobs/{id}/status: data.status is IN_QUEUE, IN_PROGRESS,
+COMPLETED, FAILED, CANCELED; then GET /v1/jobs/{id}/result lists
+data.result.artifacts[].url. The status response's error field for a
+failed job is not documented, so `error` is left unset.
+Idempotency-Key (required on submit) is the per-job {{uuid}}, sent as a
+submit-only header.
+Upload: POST /v1/files/generate-upload-url {content_type, size_bytes,
+filename} returns data.upload_url, data.public_url and data.upload_headers
+(content-type, content-length), which are replayed on the PUT. The PUT
+must not carry the API key. The upload URL expires 15 minutes after it is
+issued. public_url works as soon as the PUT returns 200. The optional
+POST /v1/assets/{asset_id}/complete check is skipped.
+"""
+
+[example]
+model = "seedance-2.5"
+input = { prompt = "a red fox running through snow", image_url = "https://example.com/fox.png" }
+
+[auth]
+type = "bearer"
+env = ["SUME_API_KEY"]
+
+[submit]
+url = "/v1/video-router/generate"
+headers = { "Idempotency-Key" = "{{uuid}}" }
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/data/job/id" }
+
+[poll]
+url = "/v1/jobs/{{id}}/status"
+status = "/data/status"
+success = ["COMPLETED"]
+failure = ["FAILED", "CANCELED"]
+
+[result]
+url = "/v1/jobs/{{id}}/result"
+outputs = ["/data/result/artifacts"]
+
+[upload]
+type = "put"
+url = "/v1/files/generate-upload-url"
+body = { content_type = "{{mime}}", size_bytes = "{{size_bytes}}", filename = "{{file_name}}" }
+capture = { upload_url = "/data/upload_url", file_url = "/data/public_url" }
+put_headers = "/data/upload_headers"
+
+[[route]]
+strip_prefix = "video:"
+models = ["video:*"]
+
+[[route]]
+strip_prefix = "image:"
+models = [
+  "image:*",
+  "gpt-image-*", "nano-banana-*", "seedream-*", "grok-image",
+  "ideogram-*", "recraft-*", "qwen-image-*",
+]
+[route.submit]
+url = "/v1/image-router/generate"
+headers = { "Idempotency-Key" = "{{uuid}}" }
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/data/job/id" }

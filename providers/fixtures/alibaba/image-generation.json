@@ -1,0 +1,107 @@
+{
+  "source": "Alibaba Model Studio wan image API reference: async create and SUCCEEDED examples (ids shortened).",
+  "model": "wan2.6-t2i",
+  "input": {
+    "input": {
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "text": "a lighthouse"
+            }
+          ]
+        }
+      ]
+    },
+    "parameters": {
+      "size": "1280*1280",
+      "n": 1
+    }
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/image-generation/generation",
+        "body": {
+          "model": "wan2.6-t2i",
+          "input": {
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "text": "a lighthouse"
+                  }
+                ]
+              }
+            ]
+          },
+          "parameters": {
+            "size": "1280*1280",
+            "n": 1
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "output": {
+            "task_status": "PENDING",
+            "task_id": "0385dc79-5ff8"
+          },
+          "request_id": "4909100c-7b5a"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://dashscope-intl.aliyuncs.com/api/v1/tasks/0385dc79-5ff8"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "request_id": "2ddf53fa-699b",
+          "output": {
+            "task_id": "0385dc79-5ff8",
+            "task_status": "SUCCEEDED",
+            "submit_time": "2025-12-18 20:03:01.802",
+            "scheduled_time": "2025-12-18 20:03:01.834",
+            "end_time": "2025-12-18 20:03:29.260",
+            "finished": true,
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "role": "assistant",
+                  "content": [
+                    {
+                      "image": "https://dashscope-result-bj.oss-cn-beijing.aliyuncs.com/xxx.png?Expires=xxx",
+                      "type": "image"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "usage": {
+            "size": "1280*1280",
+            "total_tokens": 0,
+            "image_count": 1,
+            "output_tokens": 0,
+            "input_tokens": 0
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://dashscope-result-bj.oss-cn-beijing.aliyuncs.com/xxx.png?Expires=xxx"
+    ]
+  }
+}

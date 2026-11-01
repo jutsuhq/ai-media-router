@@ -1,0 +1,55 @@
+{
+  "source": "Runway ephemeral uploads: POST /v1/uploads returns uploadUrl + fields (presigned POST) and runwayUri; values invented.",
+  "upload": {
+    "file_name": "ref.png",
+    "mime": "image/png"
+  },
+  "exchanges": [
+    {
+      "step": "upload",
+      "request": {
+        "method": "POST",
+        "url": "https://api.dev.runwayml.com/v1/uploads",
+        "body": {
+          "filename": "ref.png",
+          "type": "ephemeral"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "uploadUrl": "https://runway-uploads.s3.amazonaws.com/",
+          "fields": {
+            "key": "uploads/u1/ref.png",
+            "policy": "eyJwb2xpY3kiOiJ4In0=",
+            "x-amz-signature": "sig"
+          },
+          "runwayUri": "runway://uploads/u1/ref.png"
+        }
+      }
+    },
+    {
+      "step": "upload_post",
+      "request": {
+        "method": "POST",
+        "url": "https://runway-uploads.s3.amazonaws.com/",
+        "headers": {
+          "content-type": "multipart/form-data"
+        },
+        "body": {
+          "key": "uploads/u1/ref.png",
+          "policy": "eyJwb2xpY3kiOiJ4In0=",
+          "x-amz-signature": "sig",
+          "file": "<file ref.png, image/png, 7 bytes>"
+        }
+      },
+      "response": {
+        "status": 204,
+        "body": ""
+      }
+    }
+  ],
+  "expect": {
+    "reference": "runway://uploads/u1/ref.png"
+  }
+}

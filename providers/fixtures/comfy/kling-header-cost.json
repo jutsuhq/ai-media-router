@@ -1,0 +1,92 @@
+{
+  "source": "Comfy Router queue API; cost comes from the X-Comfy-Credits-Used response header; result is Kling's native payload. Values invented.",
+  "model": "kling/kling-v3",
+  "input": {
+    "prompt": "a paper boat on a river",
+    "aspect_ratio": "16:9",
+    "duration": "5",
+    "mode": "std"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.comfy.org/v2/models/kling/kling-v3/requests",
+        "headers": {
+          "x-api-key": "<COMFY_API_KEY>"
+        },
+        "body": {
+          "prompt": "a paper boat on a river",
+          "aspect_ratio": "16:9",
+          "duration": "5",
+          "mode": "std"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "request_id": "req_1"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.comfy.org/v2/models/kling/kling-v3/requests/req_1/status"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "IN_PROGRESS"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.comfy.org/v2/models/kling/kling-v3/requests/req_1/status"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "COMPLETED"
+        }
+      }
+    },
+    {
+      "step": "result",
+      "request": {
+        "method": "GET",
+        "url": "https://api.comfy.org/v2/models/kling/kling-v3/requests/req_1"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Comfy-Credits-Used": "42.5"
+        },
+        "body": {
+          "data": {
+            "task_result": {
+              "videos": [
+                {
+                  "id": "v1",
+                  "url": "https://cdn.klingai.com/boat.mp4",
+                  "duration": "5"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://cdn.klingai.com/boat.mp4"
+    ],
+    "cost": 42.5
+  }
+}

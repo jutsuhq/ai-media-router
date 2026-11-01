@@ -1,0 +1,65 @@
+{
+  "source": "Response shape as documented in this spec's notes (from the provider docs); values invented.",
+  "model": "gpt-image-2",
+  "input": {
+    "prompt": "a lighthouse"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.apimart.ai/v1/images/generations",
+        "body": {
+          "model": "gpt-image-2",
+          "prompt": "a lighthouse"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": [
+            {
+              "status": "submitted",
+              "task_id": "task_01"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.apimart.ai/v1/tasks/task_01?language=en"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "id": "task_01",
+            "status": "completed",
+            "cost": 0.02,
+            "result": {
+              "images": [
+                {
+                  "url": [
+                    "https://upload.apimart.ai/f/image/lighthouse.png"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://upload.apimart.ai/f/image/lighthouse.png"
+    ],
+    "cost": 0.02
+  }
+}

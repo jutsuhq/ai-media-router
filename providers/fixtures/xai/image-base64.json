@@ -1,0 +1,42 @@
+{
+  "source": "xAI images reference: b64_json is raw base64 typed by data[].mime_type; values invented.",
+  "model": "image:grok-imagine-image-2.0",
+  "input": {
+    "prompt": "a lighthouse",
+    "response_format": "b64_json"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.x.ai/v1/images/generations",
+        "body": {
+          "model": "grok-imagine-image-2.0",
+          "response_format": "b64_json",
+          "prompt": "a lighthouse"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "data": [
+            {
+              "b64_json": "aGk=",
+              "mime_type": "image/jpeg"
+            }
+          ],
+          "usage": {
+            "cost_in_usd_ticks": 200000000
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "inline:image/jpeg:2"
+    ],
+    "cost": 0.02
+  }
+}

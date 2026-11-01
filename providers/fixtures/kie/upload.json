@@ -1,0 +1,39 @@
+{
+  "source": "File stream upload response shape from docs.kie.ai file-upload API; URL invented.",
+  "upload": {
+    "file_name": "ref.png",
+    "mime": "image/png"
+  },
+  "exchanges": [
+    {
+      "step": "upload",
+      "request": {
+        "method": "POST",
+        "url": "https://kieai.redpandaai.co/api/file-stream-upload",
+        "body": {
+          "uploadPath": "ai-media-router",
+          "fileName": "ref.png",
+          "file": "<file ref.png, image/png, 7 bytes>"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "code": 200,
+          "msg": "File uploaded successfully",
+          "data": {
+            "fileName": "ref.png",
+            "filePath": "ai-media-router/ref.png",
+            "downloadUrl": "https://tempfile.redpandaai.co/kieai/ai-media-router/ref.png",
+            "fileSize": 7,
+            "mimeType": "image/png"
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "reference": "https://tempfile.redpandaai.co/kieai/ai-media-router/ref.png"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "source": "Kling image generation reference (legacy /v1/images/generations): query example structure; values invented.",
+  "model": "images/generations",
+  "input": {
+    "model_name": "kling-v3",
+    "prompt": "a lighthouse",
+    "resolution": "1k",
+    "n": 1
+  },
+  "env": {
+    "KLING_ACCESS_KEY": "ak",
+    "KLING_SECRET_KEY": "sk"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api-singapore.klingai.com/v1/images/generations",
+        "body": {
+          "model_name": "kling-v3",
+          "prompt": "a lighthouse",
+          "resolution": "1k",
+          "n": 1
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "message": "SUCCEED",
+          "request_id": "r1",
+          "data": {
+            "task_id": "img_task_1",
+            "task_status": "submitted",
+            "created_at": 1722769557708,
+            "updated_at": 1722769557708
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api-singapore.klingai.com/v1/images/generations/img_task_1"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "message": "SUCCEED",
+          "request_id": "r2",
+          "data": {
+            "task_id": "img_task_1",
+            "task_status": "succeed",
+            "task_status_msg": "",
+            "created_at": 1722769557708,
+            "updated_at": 1722769557708,
+            "task_result": {
+              "images": [
+                {
+                  "index": 0,
+                  "url": "https://cdn.klingai.com/img/lighthouse.png",
+                  "watermark_url": "https://cdn.klingai.com/img/lighthouse-wm.png"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://cdn.klingai.com/img/lighthouse.png"
+    ]
+  }
+}

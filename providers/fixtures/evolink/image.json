@@ -1,0 +1,55 @@
+{
+  "source": "Response shape as documented in this spec's notes (from the provider docs); values invented.",
+  "model": "doubao-seedream-5.0-pro",
+  "input": {
+    "prompt": "a lighthouse"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.evolink.ai/v1/images/generations",
+        "body": {
+          "model": "doubao-seedream-5.0-pro",
+          "prompt": "a lighthouse"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "task-unified-1",
+          "status": "pending"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.evolink.ai/v1/tasks/task-unified-1"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "task-unified-1",
+          "status": "completed",
+          "results": [
+            "https://files.evolink.ai/lighthouse.png"
+          ],
+          "usage": {
+            "cost": {
+              "usd": 0.03
+            }
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://files.evolink.ai/lighthouse.png"
+    ],
+    "cost": 0.03
+  }
+}

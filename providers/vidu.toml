@@ -1,0 +1,34 @@
+key = "vidu"
+name = "Vidu (platform API)"
+catalog = ["Vidu"]
+docs = "https://platform.vidu.com/docs/api-reference/task-management/task-detail"
+model_hint = "Task endpoint under /ent/v2/, e.g. `img2video`, `text2video` or `reference2image`. The Vidu model goes into `input.model` (e.g. `viduq2` for text2video); `input` is the full request body: `model`, `prompt`, `images` (array of public URLs or data:image/...;base64 URIs), `duration`, `resolution`, `aspect_ratio`. Images: `reference2image` with `input.model` `viduq2` (0-7 `images`; 0 = text-to-image) or `viduq1` (1-7), plus `prompt`, `aspect_ratio`, `resolution` (`1080p`, `2K`, `4K`), `seed`."
+base_url = "https://api.vidu.com"
+notes = "Images use the same task flow: POST /ent/v2/reference2image -> task_id, results in creations[].url; there is no separate text2image endpoint. Task states: created, queueing, processing, success, failed. Errors arrive as non-2xx; the error body shape is not documented. Poll exposes only `err_code` (no message text). creations[].url is valid for 24 hours. China host is https://api.vidu.cn."
+
+[example]
+model = "text2video"
+input = { model = "viduq2", prompt = "a red fox running through snow", duration = 5, resolution = "720p", aspect_ratio = "16:9" }
+
+[auth]
+type = "header"
+env = ["VIDU_API_KEY"]
+name = "Authorization"
+prefix = "Token "
+
+[submit]
+url = "/ent/v2/{{model}}"
+body = "{{input}}"
+capture = { id = "/task_id" }
+
+[poll]
+url = "/ent/v2/tasks/{{id}}/creations"
+status = "/state"
+success = ["success"]
+failure = ["failed"]
+error = "/err_code"
+cost = "/credits"
+outputs = ["/creations/*/url"]
+
+[upload]
+type = "data_uri"

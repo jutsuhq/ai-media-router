@@ -1,0 +1,45 @@
+key = "fal"
+name = "fal.ai"
+catalog = ["fal"]
+docs = "https://fal.ai/docs/model-apis/model-endpoints/queue"
+model_hint = "Full fal endpoint id as shown on the model's API page at fal.ai/models, including any subpath, e.g. `fal-ai/kling-video/v2.1/pro/image-to-video` or `fal-ai/flux/schnell`. `input` is that endpoint's input object as-is (e.g. `{\"prompt\": \"...\", \"image_url\": \"...\"}`)."
+base_url = "https://queue.fal.run"
+notes = """
+Queue API. Status/result URLs use only owner/app (not the subpath), so the
+URLs returned by submit (`status_url`, `response_url`) are captured and used
+instead of being built from the model id.
+The status endpoint has no failure status value: it reports IN_QUEUE,
+IN_PROGRESS, COMPLETED and adds `error`/`error_type` when a request failed,
+so a failed request ends as COMPLETED with `error` set; the result request
+then fails. `failure` is left empty for that reason.
+Result body is model-specific; outputs cover the common `images`, `image`,
+`video` and `audio` fields (objects with `url`).
+Upload: fal documents no REST upload endpoint for its CDN (SDK only), so
+local files go in as data URIs, which fal accepts but discourages above a
+few KB. For large references pass a public URL instead.
+"""
+
+[auth]
+type = "header"
+env = ["FAL_KEY"]
+name = "Authorization"
+prefix = "Key "
+
+[submit]
+url = "/{{model}}"
+body = "{{input}}"
+capture = { id = "/request_id", status_url = "/status_url", response_url = "/response_url" }
+
+[poll]
+url = "{{status_url}}"
+status = "/status"
+success = ["COMPLETED"]
+failure = []
+error = "/error"
+
+[result]
+url = "{{response_url}}"
+outputs = ["/images", "/image", "/video", "/audio"]
+
+[upload]
+type = "data_uri"

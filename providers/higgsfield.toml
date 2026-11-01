@@ -1,0 +1,38 @@
+key = "higgsfield"
+name = "Higgsfield"
+catalog = ["Higgsfield"]
+docs = "https://docs.higgsfield.ai/docs/quickstart"
+model_hint = "Model id is the URL path of the model's endpoint as shown in the Higgsfield console/docs, e.g. `higgsfield-ai/soul/v2/standard` (image) or `higgsfield/genjutsu/motion-transfer/v1.0` (video). `input` is that model's flat request body, e.g. {\"prompt\": \"...\", \"image_urls\": [\"https://...\"]}."
+base_url = "https://api.higgsfield.ai"
+notes = "Auth header is `Authorization: Key {api_key_id}:{api_key_secret}`; built from HIGGSFIELD_API_KEY_ID and HIGGSFIELD_API_SECRET. Docs use api.higgsfield.ai (older pages mention platform.higgsfield.ai with legacy hf-api-key/hf-secret headers). Upload PUT replays every header from `upload_headers` (Content-Type, x-amz-tagging). Output URLs expire at `expires_at`."
+
+[example]
+model = "higgsfield-ai/soul/v2/standard"
+input = { prompt = "a red fox running through snow" }
+
+[auth]
+type = "none"
+env = ["HIGGSFIELD_API_KEY_ID", "HIGGSFIELD_API_SECRET"]
+
+[headers]
+Authorization = "Key {{env.HIGGSFIELD_API_KEY_ID}}:{{env.HIGGSFIELD_API_SECRET}}"
+
+[submit]
+url = "/{{model}}"
+body = "{{input}}"
+capture = { id = "/request_id" }
+
+[poll]
+url = "/requests/{{id}}/status"
+status = "/status"
+success = ["completed"]
+failure = ["failed", "nsfw", "canceled"]
+error = "/error"
+outputs = ["/images", "/video"]
+
+[upload]
+type = "put"
+url = "/files/generate-upload-url"
+body = { content_type = "{{mime}}" }
+capture = { upload_url = "/upload_url", file_url = "/public_url" }
+put_headers = "/upload_headers"

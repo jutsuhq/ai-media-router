@@ -1,0 +1,17 @@
+{
+  "source": "ComfyUI server.py POST /upload/image: multipart field `image`, returns {name, subfolder, type}; the name goes into LoadImage.",
+  "env": { "COMFYUI_URL": "http://127.0.0.1:8188" },
+  "upload": { "file_name": "ref.png", "mime": "image/png" },
+  "exchanges": [
+    {
+      "step": "upload",
+      "request": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8188/upload/image",
+        "body": { "image": "<file ref.png, image/png, 7 bytes>" }
+      },
+      "response": { "status": 200, "body": { "name": "ref.png", "subfolder": "", "type": "input" } }
+    }
+  ],
+  "expect": { "reference": "ref.png" }
+}

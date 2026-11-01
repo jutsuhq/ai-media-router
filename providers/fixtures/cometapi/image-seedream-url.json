@@ -1,0 +1,38 @@
+{
+  "source": "CometAPI Seedream on /v1/images/generations returns data[].url; values invented.",
+  "model": "doubao-seedream-5-0-260128",
+  "input": {
+    "prompt": "a lighthouse",
+    "response_format": "url"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.cometapi.com/v1/images/generations",
+        "body": {
+          "model": "doubao-seedream-5-0-260128",
+          "prompt": "a lighthouse",
+          "response_format": "url"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "created": 1781075000,
+          "data": [
+            {
+              "url": "https://ark-content-generation.example/lighthouse.jpeg"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://ark-content-generation.example/lighthouse.jpeg"
+    ]
+  }
+}

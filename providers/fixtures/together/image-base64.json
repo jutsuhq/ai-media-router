@@ -1,0 +1,42 @@
+{
+  "source": "Together images API schema: data[] item variant {index, b64_json, type: b64_json}; the docs show no example, values invented.",
+  "model": "black-forest-labs/FLUX.1-schnell",
+  "input": {
+    "prompt": "a lighthouse",
+    "response_format": "base64"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.together.ai/v1/images/generations",
+        "body": {
+          "model": "black-forest-labs/FLUX.1-schnell",
+          "response_format": "base64",
+          "prompt": "a lighthouse"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "img_2",
+          "model": "black-forest-labs/FLUX.1-schnell",
+          "object": "list",
+          "data": [
+            {
+              "index": 0,
+              "b64_json": "aGk=",
+              "type": "b64_json"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "inline:image/jpeg:2"
+    ]
+  }
+}

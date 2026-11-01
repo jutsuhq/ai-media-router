@@ -1,0 +1,47 @@
+key = "vertex"
+name = "Google Vertex AI (Gemini Enterprise Agent Platform)"
+catalog = ["Google Vertex AI"]
+docs = "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/video/generate-videos-from-text"
+model_hint = "`model` is the Vertex publisher model id, e.g. `veo-3.1-generate-001`, `veo-3.1-fast-generate-001`, `veo-3.1-lite-generate-001`, a Gemini image model such as `gemini-3-pro-image`, or an Imagen model such as `imagen-4.0-generate-001`. For Veo, `input` is the predictLongRunning body: {\"instances\": [{\"prompt\": \"...\", \"image\": {\"bytesBase64Encoded\": \"...\", \"mimeType\": \"image/png\"}}], \"parameters\": {\"aspectRatio\": \"16:9\", \"resolution\": \"1080p\", \"sampleCount\": 1}} (leave out storageUri). For Gemini image models, `input` is the generateContent body: {\"contents\": [{\"role\": \"USER\", \"parts\": [{\"text\": \"...\"}]}], \"generationConfig\": {\"responseModalities\": [\"TEXT\", \"IMAGE\"]}}. For Imagen, `input` is the predict body: {\"instances\": [{\"prompt\": \"...\"}], \"parameters\": {\"sampleCount\": 1, \"aspectRatio\": \"16:9\"}} (leave out storageUri)."
+base_url = "https://aiplatform.googleapis.com"
+notes = "Veo calls go to the regional host https://{GOOGLE_CLOUD_LOCATION}-aiplatform.googleapis.com, so GOOGLE_CLOUD_LOCATION must be a region such as us-central1, not `global`; Gemini image models use the documented global endpoint. Omit parameters.storageUri: with it Veo returns gs:// URIs, which the engine cannot download (no GCS fetch); without it the docs say video bytes are returned inline. The inline field name /response/videos/*/bytesBase64Encoded is inferred from the request-side image field and third-party clients; the official guide only shows the gcsUri variant. Reference images must be inline base64 or gs:// URIs inside `input`; there is no upload step that yields a gs:// URI. A done operation whose videos were all RAI-filtered (response.raiMediaFilteredCount > 0) ends as `finished without output files`. Gemini image outputs are typed by inlineData.mimeType (output_mime is the fallback). Imagen (imagen-*) uses the synchronous regional :predict call; images come back as predictions[].bytesBase64Encoded typed by predictions[].mimeType; RAI-filtered samples are simply missing."
+
+[example]
+model = "veo-3.1-generate-001"
+input = { instances = [{ prompt = "a red fox running through snow" }], parameters = { aspectRatio = "16:9", resolution = "1080p", sampleCount = 1 } }
+
+[auth]
+type = "command"
+command = ["gcloud", "auth", "print-access-token"]
+env = ["GOOGLE_ACCESS_TOKEN"]
+
+[submit]
+url = "https://{{env.GOOGLE_CLOUD_LOCATION}}-aiplatform.googleapis.com/v1/projects/{{env.GOOGLE_CLOUD_PROJECT}}/locations/{{env.GOOGLE_CLOUD_LOCATION}}/publishers/google/models/{{model}}:predictLongRunning"
+body = "{{input}}"
+capture = { id = "/name" }
+
+[poll]
+method = "POST"
+url = "https://{{env.GOOGLE_CLOUD_LOCATION}}-aiplatform.googleapis.com/v1/projects/{{env.GOOGLE_CLOUD_PROJECT}}/locations/{{env.GOOGLE_CLOUD_LOCATION}}/publishers/google/models/{{model}}:fetchPredictOperation"
+body = { operationName = "{{id}}" }
+status = "/done"
+success = ["true"]
+error = "/error/message"
+outputs_base64 = ["/response/videos/*"]
+output_mime = "video/mp4"
+
+[[route]]
+models = ["gemini-*"]
+[route.submit]
+url = "https://aiplatform.googleapis.com/v1/projects/{{env.GOOGLE_CLOUD_PROJECT}}/locations/global/publishers/google/models/{{model}}:generateContent"
+body = "{{input}}"
+outputs_base64 = ["/candidates/*/content/parts/*/inlineData"]
+output_mime = "image/png"
+
+[[route]]
+models = ["imagen-*"]
+[route.submit]
+url = "https://{{env.GOOGLE_CLOUD_LOCATION}}-aiplatform.googleapis.com/v1/projects/{{env.GOOGLE_CLOUD_PROJECT}}/locations/{{env.GOOGLE_CLOUD_LOCATION}}/publishers/google/models/{{model}}:predict"
+body = "{{input}}"
+outputs_base64 = ["/predictions/*"]
+output_mime = "image/png"

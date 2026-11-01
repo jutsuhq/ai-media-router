@@ -1,0 +1,82 @@
+{
+  "source": "Alibaba text2image (wan2.5 and earlier) API reference: async create and SUCCEEDED examples (ids shortened).",
+  "model": "wan2.5-t2i-preview",
+  "input": {
+    "input": {
+      "prompt": "A flower shop"
+    },
+    "parameters": {
+      "size": "1280*1280",
+      "n": 1
+    }
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis",
+        "body": {
+          "model": "wan2.5-t2i-preview",
+          "input": {
+            "prompt": "A flower shop"
+          },
+          "parameters": {
+            "size": "1280*1280",
+            "n": 1
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "output": {
+            "task_status": "PENDING",
+            "task_id": "d492bffd-10b5"
+          },
+          "request_id": "7574ee8f-38a3"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://dashscope-intl.aliyuncs.com/api/v1/tasks/d492bffd-10b5"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "request_id": "f767d108-7d50",
+          "output": {
+            "task_id": "d492bffd-10b5",
+            "task_status": "SUCCEEDED",
+            "submit_time": "2025-01-08 16:03:59.840",
+            "scheduled_time": "2025-01-08 16:03:59.863",
+            "end_time": "2025-01-08 16:04:10.660",
+            "results": [
+              {
+                "orig_prompt": "A flower shop",
+                "actual_prompt": "A flower shop",
+                "url": "https://dashscope-result-wlcb.oss-cn-wulanchabu.aliyuncs.com/1.png"
+              }
+            ],
+            "task_metrics": {
+              "TOTAL": 1,
+              "SUCCEEDED": 1,
+              "FAILED": 0
+            }
+          },
+          "usage": {
+            "image_count": 1
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://dashscope-result-wlcb.oss-cn-wulanchabu.aliyuncs.com/1.png"
+    ]
+  }
+}

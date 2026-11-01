@@ -1,0 +1,44 @@
+key = "gemini"
+name = "Gemini API (Google AI Studio)"
+catalog = ["Gemini API"]
+docs = "https://ai.google.dev/gemini-api/docs/omni"
+model_hint = "`model` is the Gemini API model id, e.g. `gemini-omni-1.1-flash` (video) or `gemini-nano-banana-2.1` / `gemini-3-pro-image` (image). `input` is merged into the Interactions request body, so it must hold the `input` field and optionally `response_format`, e.g. {\"input\": [{\"type\": \"image\", \"data\": \"<base64>\", \"mime_type\": \"image/jpeg\"}, {\"type\": \"text\", \"text\": \"...\"}], \"response_format\": {\"type\": \"video\", \"aspect_ratio\": \"9:16\", \"resolution\": \"1080p\"}}. Prefix `image:` (e.g. `image:<model id>`) forces the synchronous image call, `video:` the background video call, for ids the `*image*` / `*nano-banana*` globs misjudge."
+base_url = "https://generativelanguage.googleapis.com"
+notes = "Veo 3.1 Preview (veo-3.1-*-preview) on the Gemini API was shut down on 2026-10-22, and predictLongRunning/operations no longer serve video here; generation now goes through the Interactions API (POST /v1beta/interactions), so this spec targets that. Video jobs use background mode and poll GET /v1beta/interactions/{id}; that GET returns the whole step timeline including the user_input step, so outputs are read only from steps whose `type` is `model_output` (pointer filter `*[type=model_output]`); otherwise inline reference media from the user_input step would come back as extra outputs. That `type` value follows the docs' step naming and is unverified. Background mode is documented for standard Gemini models; its support for gemini-omni-* is not stated. Inline video delivery is meant for results under 4MB; `delivery: uri` returns a Files API URI that must reach state ACTIVE and be fetched via the Files API, which this spec cannot express, so do not set it. The error field of a failed interaction is not documented, so failures report only the status. Image models run synchronously (POST returns only output steps); each item's `mime_type` is used (output_mime is only the fallback). No upload step: the Files API uses resumable uploads with the upload URL in a response header."
+
+[auth]
+type = "header"
+env = ["GEMINI_API_KEY"]
+name = "x-goog-api-key"
+
+[auth_check]
+url = "/v1beta/models"
+
+[headers]
+"Api-Revision" = "2026-05-20"
+
+[submit]
+url = "/v1beta/interactions"
+body = { "$merge" = "{{input}}", model = "{{model}}", background = true }
+capture = { id = "/id" }
+
+[poll]
+url = "/v1beta/interactions/{{id}}"
+status = "/status"
+success = ["completed"]
+failure = ["failed", "cancelled"]
+outputs_base64 = ["/steps/*[type=model_output]/content/*"]
+output_mime = "video/mp4"
+
+[[route]]
+strip_prefix = "video:"
+models = ["video:*"]
+
+[[route]]
+strip_prefix = "image:"
+models = ["image:*", "*image*", "*nano-banana*"]
+[route.submit]
+url = "/v1beta/interactions"
+body = { "$merge" = "{{input}}", model = "{{model}}" }
+outputs_base64 = ["/steps/*[type=model_output]/content/*"]
+output_mime = "image/png"

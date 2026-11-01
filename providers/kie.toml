@@ -1,0 +1,39 @@
+key = "kie"
+name = "kie.ai"
+catalog = ["kie.ai"]
+docs = "https://docs.kie.ai/market"
+model_hint = "Model id from the kie market docs, e.g. `kling-2.6/image-to-video`. `input` is that model's input object."
+base_url = "https://api.kie.ai"
+cost_unit = "credits"
+
+[auth]
+type = "bearer"
+env = ["KIE_API_KEY"]
+
+[auth_check]
+url = "/api/v1/chat/credit"
+
+[errors]
+code = "/code"
+ok = [200]
+message = "/msg"
+
+[submit]
+url = "/api/v1/jobs/createTask"
+body = { model = "{{model}}", input = "{{input}}" }
+capture = { id = "/data/taskId" }
+
+[poll]
+url = "/api/v1/jobs/recordInfo?taskId={{id}}"
+status = "/data/state"
+success = ["success"]
+failure = ["fail"]
+error = "/data/failMsg"
+cost = "/data/creditsConsumed"
+outputs = ["/data/resultJson#/resultUrls"]
+
+[upload]
+type = "multipart"
+url = "https://kieai.redpandaai.co/api/file-stream-upload"
+fields = { uploadPath = "ai-media-router", fileName = "{{file_name}}" }
+result = "/data/downloadUrl"

@@ -1,0 +1,47 @@
+key = "replicate"
+name = "Replicate"
+catalog = ["Replicate"]
+docs = "https://replicate.com/docs/reference/http"
+model_hint = "Model as `owner/name` (latest version) or `owner/name:version_id`, e.g. `kwaivgi/kling-v2.1` or `black-forest-labs/flux-schnell`. `input` is that model's input object from its API tab on replicate.com."
+base_url = "https://api.replicate.com"
+download_auth = true
+notes = """
+Uses the generic POST /v1/predictions with `version`, which the docs say
+accepts `owner/name`, `owner/name:version_id` or a bare version id, so any
+model works without the official-models-only route.
+Output files on replicate.delivery: docs say requests for them need the
+Authorization header, hence download_auth.
+Upload: POST /v1/files (multipart field `content`); the file's `urls.get`
+is passed as input, as the official clients do. Data URIs also work
+(recommended by docs only under ~256 KB-1 MB).
+"""
+
+[example]
+model = "kwaivgi/kling-v2.1"
+input = { prompt = "a red fox running through snow" }
+
+[auth]
+type = "bearer"
+env = ["REPLICATE_API_TOKEN"]
+
+[auth_check]
+url = "/v1/account"
+
+[submit]
+url = "/v1/predictions"
+body = { version = "{{model}}", input = "{{input}}" }
+capture = { id = "/id" }
+
+[poll]
+url = "/v1/predictions/{{id}}"
+status = "/status"
+success = ["succeeded"]
+failure = ["failed", "canceled"]
+error = "/error"
+outputs = ["/output"]
+
+[upload]
+type = "multipart"
+url = "https://api.replicate.com/v1/files"
+file_field = "content"
+result = "/urls/get"

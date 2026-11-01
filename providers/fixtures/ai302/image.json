@@ -1,0 +1,67 @@
+{
+  "source": "302.AI V2 image docs: async generate example and fetch success example (ids/URLs shortened).",
+  "model": "image:baidu-irag-t2i",
+  "input": {
+    "prompt": "sky city"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.302.ai/302/v2/image/generate?run_async=true",
+        "body": {
+          "model": "baidu-irag-t2i",
+          "prompt": "sky city"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task_id": "2ec88806-0000-4000-8000-000000000001",
+          "status": "pending",
+          "created_at": "2025-08-19T11:10:13.162917Z"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.302.ai/302/v2/image/fetch/2ec88806-0000-4000-8000-000000000001"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "model": "baidu-irag-t2i",
+          "req": {
+            "prompt": "sky city",
+            "model": "baidu-irag-t2i"
+          },
+          "task_id": "2ec88806-0000-4000-8000-000000000001",
+          "status": "completed",
+          "task_type": "image",
+          "webhook": "",
+          "image_url": "https://file.302ai.cn/gpt/imgs/6115fd00.png",
+          "image_urls": [
+            "https://file.302ai.cn/gpt/imgs/6115fd00.png"
+          ],
+          "raw_response": {
+            "id": "as-aecbzqbxg5",
+            "created": 1755601791,
+            "data": [
+              {
+                "url": "https://file.302ai.cn/gpt/imgs/6115fd00.png"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://file.302ai.cn/gpt/imgs/6115fd00.png"
+    ]
+  }
+}

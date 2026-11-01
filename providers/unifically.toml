@@ -1,0 +1,42 @@
+key = "unifically"
+name = "Unifically"
+catalog = ["UnificAlly"]
+docs = "https://docs.unifically.com/api-reference/v1-tasks"
+model_hint = "Model id in `provider/model-name` form from the Unifically Tasks API model table, e.g. `kuaishou/kling-2.6-video` or `google/veo-3.1-fast`. `input` is that model's input object from its model page (e.g. `{\"prompt\": \"...\", \"image_url\": \"...\"}`)."
+base_url = "https://api.unifically.com"
+cost_unit = "USD"
+notes = "Task endpoints return `{code, success, data}`; non-2xx bodies carry the message at `/data/message`. `cost` (USD) is documented as a task field; the single-task GET example omits it, so it may be absent. Audio models return `output.audio_url`, which the output reader picks up like `url`. Upload uses PUT multipart per the docs (`upload.method`)."
+
+[example]
+model = "kuaishou/kling-2.6-video"
+input = { prompt = "a red fox running through snow", image_url = "https://example.com/fox.png" }
+
+[auth]
+type = "bearer"
+env = ["UNIFICALLY_API_KEY"]
+
+[errors]
+code = "/code"
+ok = [200]
+message = "/data/message"
+
+[submit]
+url = "/v1/tasks"
+body = { model = "{{model}}", input = "{{input}}" }
+capture = { id = "/data/task_id" }
+
+[poll]
+url = "/v1/tasks/{{id}}"
+status = "/data/status"
+success = ["completed"]
+failure = ["failed"]
+error = "/data/error_message"
+cost = "/data/cost"
+outputs = ["/data/output"]
+
+[upload]
+type = "multipart"
+method = "PUT"
+url = "https://files.unifically.com/upload"
+file_field = "file"
+result = "/file_url"

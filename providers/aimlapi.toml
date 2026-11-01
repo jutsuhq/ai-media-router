@@ -1,0 +1,73 @@
+key = "aimlapi"
+name = "AI/ML API"
+catalog = ["AI/ML API"]
+docs = "https://docs.aimlapi.com/api-references/video-models"
+model_hint = "`model` is the exact `model` enum value from the model's API schema on docs.aimlapi.com (not the page slug), e.g. `google/veo-3.1-i2v` or `klingai/v2.1-master-image-to-video` for video, `flux/schnell` or `openai/gpt-image-2` for images. `input` is the rest of that model's request body, merged in as-is (e.g. `{\"prompt\": \"...\", \"image_url\": \"https://...\"}`). Prefix `image:` (e.g. `image:<model id>`) forces the image endpoint for ids the route globs miss; `video:` forces the video endpoint for ids a glob catches wrongly."
+base_url = "https://api.aimlapi.com"
+cost_unit = "credits"
+notes = """
+Video: async POST /v2/video/generations returns {id, status}; poll
+GET /v2/video/generations?generation_id=<id>. Status: queued, generating,
+completed, error. Result in video.url, failure text in error.message,
+credits in meta.usage.credits_used.
+Images: synchronous POST /v1/images/generations, result data[].url or
+data[].b64_json. Image models are matched by the glob list in the route
+below, built from the image-model docs on 2026-10-31; a new image model
+outside these globs goes to the video endpoint unless prefixed with `image:`;
+add it here.
+Not covered: /v1/images/edits (openai/gpt-image-*, x-ai/grok-imagine-image-2.0
+edits), which takes local files as objects rather than URLs; the routed
+generations endpoint is used for those model ids.
+Upload: docs say image fields take "a direct link ... or a Base64-encoded
+local image", but the schemas declare `format: uri`; data URIs are assumed
+to be the accepted base64 form (unverified).
+"""
+
+[example]
+model = "google/veo-3.1-i2v"
+input = { prompt = "a red fox running through snow", image_url = "https://example.com/fox.png" }
+
+[auth]
+type = "bearer"
+env = ["AIMLAPI_API_KEY"]
+
+[submit]
+url = "/v2/video/generations"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/id" }
+
+[poll]
+url = "/v2/video/generations?generation_id={{id}}"
+status = "/status"
+success = ["completed"]
+failure = ["error"]
+error = "/error/message"
+cost = "/meta/usage/credits_used"
+outputs = ["/video/url"]
+
+[[route]]
+strip_prefix = "video:"
+models = ["video:*"]
+
+[[route]]
+strip_prefix = "image:"
+models = [
+  "image:*",
+  "alibaba/qwen-image*", "alibaba/wan*-image*", "alibaba/wan2.*-t2i*", "alibaba/z-image*",
+  "beeble/switchx-image-to-image", "blackforestlabs/*",
+  "bytedance/*seedream*", "bytedance/dreamina-creative-upscale", "bytedance/uso",
+  "dall-e-*", "flux-pro*", "flux-realism", "flux/*",
+  "google/gemini-*image*", "google/imagen*", "google/nano-banana*", "imagen-*",
+  "hunyuan/hunyuan-image*", "klingai/image-*", "luma/uni-*", "meta/muse-image*",
+  "openai/gpt-image-*", "recraft-*", "reve/*", "stable-diffusion-*", "topaz-labs/sharpen*",
+  "x-ai/grok-imagine-image*",
+]
+[route.submit]
+url = "/v1/images/generations"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+outputs = ["/data/*/url"]
+outputs_base64 = ["/data/*/b64_json"]
+output_mime = "image/png"
+
+[upload]
+type = "data_uri"

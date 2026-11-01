@@ -1,0 +1,58 @@
+key = "comfyui"
+name = "ComfyUI (your own server)"
+catalog = []
+docs = "https://docs.comfy.org/development/comfyui-server/comms_routes"
+model_hint = "`model` is your own label for the workflow, e.g. `flux-dev-t2i` or `wan22-i2v`; it only names jobs, stats and recipes. `input` is the whole workflow in API format (ComfyUI: Workflow → Export (API)), the object of node ids, passed through unchanged as `{\"prompt\": input}`. Change prompts, seeds and sizes inside the node inputs. For reference images put `{{asset:…}}` or `{{ref:…}}` into a LoadImage node's `image` input: the file is uploaded to the server's input/ folder and replaced by its file name."
+base_url = "{{env.COMFYUI_URL}}"
+cost_unit = "USD"
+fixed_cost = 0
+notes = "Set COMFYUI_URL to the server, e.g. http://127.0.0.1:8188 (or a rented GPU's URL); COMFYUI_TOKEN is optional and sent as a bearer token for servers behind an authenticating proxy (save an override for another scheme). Jobs cost 0 USD, so budgets admit them without an estimate. Outputs are the files of output nodes (SaveImage, SaveVideo, SaveAudio, VHS_VideoCombine gifs); PreviewImage files (type temp) are skipped. The prompt is queued without a client_id, so progress is not streamed: a job reports `provider returned an empty response` until ComfyUI writes its history. Models and custom nodes must already be installed on the server; validation errors name the node and the fix."
+
+[example]
+model = "sd15-t2i"
+input = { "3" = { class_type = "KSampler", inputs = { seed = 1, steps = 20, cfg = 7, sampler_name = "euler", scheduler = "normal", denoise = 1, model = ["4", 0], positive = ["6", 0], negative = ["7", 0], latent_image = ["5", 0] } }, "4" = { class_type = "CheckpointLoaderSimple", inputs = { ckpt_name = "v1-5-pruned-emaonly.safetensors" } }, "5" = { class_type = "EmptyLatentImage", inputs = { width = 512, height = 512, batch_size = 1 } }, "6" = { class_type = "CLIPTextEncode", inputs = { text = "a paper boat on a river", clip = ["4", 1] } }, "7" = { class_type = "CLIPTextEncode", inputs = { text = "blurry", clip = ["4", 1] } }, "8" = { class_type = "VAEDecode", inputs = { samples = ["3", 0], vae = ["4", 2] } }, "9" = { class_type = "SaveImage", inputs = { filename_prefix = "ai-media-router", images = ["8", 0] } } }
+
+[auth]
+type = "bearer"
+env = ["COMFYUI_TOKEN"]
+optional = true
+
+[errors]
+message = ["/error/message", "/error/details", "/error/extra_info/class_type", "/node_errors/*/class_type"]
+
+[errors.hints]
+"custom node may not be installed" = "install the custom node pack that provides this class_type (ComfyUI-Manager: Install Missing Custom Nodes) and restart ComfyUI, or remove the node from the workflow"
+"has no class_type" = "`input` must be the API-format workflow (Workflow → Export (API)), not the UI workflow with `nodes` and `links`"
+"value not in list" = "the model or file named in that input is not on this server: put it into the matching ComfyUI/models/ folder (checkpoints, loras, vae, …) and refresh, or use one of the listed values; input images go through {{asset:…}} in LoadImage"
+"required input is missing" = "connect that input or give it a value in the node's `inputs`"
+"prompt has no outputs" = "add an output node such as SaveImage, SaveVideo or VHS_VideoCombine"
+"no prompt provided" = "`input` must be the API-format workflow object itself"
+"allocation on device" = "the GPU ran out of memory: lower the resolution, frame count or batch_size, or start ComfyUI with --lowvram"
+"out of memory" = "lower the resolution, frame count or batch_size, or start ComfyUI with --lowvram"
+
+[submit]
+url = "/prompt"
+body = { prompt = "{{input}}" }
+capture = { id = "/prompt_id" }
+
+[poll]
+url = "/history/{{id}}"
+status = "/*/status/status_str"
+success = ["success"]
+failure = ["error"]
+error = ["/*/status/messages/*/1/node_type", "/*/status/messages/*/1/exception_message"]
+outputs = [
+  "/*/outputs/*/images/*[type=output]",
+  "/*/outputs/*/gifs/*[type=output]",
+  "/*/outputs/*/videos/*[type=output]",
+  "/*/outputs/*/audio/*[type=output]",
+]
+output_url = "/view?filename={{filename}}&subfolder={{subfolder}}&type={{type}}"
+
+[upload]
+type = "multipart"
+url = "/upload/image"
+file_field = "image"
+result = "/name"
+usage = "the returned file name goes into a LoadImage (or LoadVideo) node: {\"10\": {\"class_type\": \"LoadImage\", \"inputs\": {\"image\": \"<name>\"}}}"
+ttl_secs = 2592000

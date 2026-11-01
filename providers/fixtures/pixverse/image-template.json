@@ -1,0 +1,68 @@
+{
+  "source": "PixVerse image template docs: submit and result example responses (customer_paths trimmed).",
+  "model": "image/template/generate",
+  "input": {
+    "template_id": 1000000000000006,
+    "img_ids": [
+      1000000000000007
+    ]
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://app-api.pixverse.ai/openapi/v2/image/template/generate",
+        "body": {
+          "template_id": 1000000000000006,
+          "img_ids": [
+            1000000000000007
+          ]
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ErrCode": 0,
+          "ErrMsg": "Success",
+          "Resp": {
+            "image_id": 1000000000000005,
+            "credits": 15
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://app-api.pixverse.ai/openapi/v2/image/result/1000000000000005"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "ErrCode": 0,
+          "ErrMsg": "Success",
+          "Resp": {
+            "image_id": 1000000000000005,
+            "prompt": "",
+            "url": "https://media.example.com/example.png",
+            "path": "pixverse/api/i2i/ori/5a5b.png",
+            "seed": 1234910949,
+            "status": 1,
+            "template_id": 1000000000000006,
+            "outputWidth": 1728,
+            "outputHeight": 2304,
+            "credits": 15
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://media.example.com/example.png"
+    ],
+    "cost": 15
+  }
+}

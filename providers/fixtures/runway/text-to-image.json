@@ -1,0 +1,71 @@
+{
+  "source": "Runway text_to_image + generic task example (output is a list of URL strings); URL invented as png.",
+  "model": "text_to_image",
+  "input": {
+    "model": "gen4_image",
+    "promptText": "a lighthouse",
+    "ratio": "1920:1080"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.dev.runwayml.com/v1/text_to_image",
+        "body": {
+          "model": "gen4_image",
+          "promptText": "a lighthouse",
+          "ratio": "1920:1080"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "d2e3d1f4-1b3c-4b5c-8d46-1c1d7ee86892",
+          "estimatedCost": {
+            "credits": 8
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.dev.runwayml.com/v1/tasks/d2e3d1f4-1b3c-4b5c-8d46-1c1d7ee86892"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "d2e3d1f4-1b3c-4b5c-8d46-1c1d7ee86892",
+          "status": "RUNNING",
+          "createdAt": "2024-06-27T19:49:32.335Z",
+          "progress": 0.5
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.dev.runwayml.com/v1/tasks/d2e3d1f4-1b3c-4b5c-8d46-1c1d7ee86892"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "d2e3d1f4-1b3c-4b5c-8d46-1c1d7ee86892",
+          "status": "SUCCEEDED",
+          "createdAt": "2024-06-27T19:49:32.335Z",
+          "output": [
+            "https://dnznrvs05pmza.cloudfront.net/output.png?_jwt=x"
+          ]
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://dnznrvs05pmza.cloudfront.net/output.png?_jwt=x"
+    ]
+  }
+}

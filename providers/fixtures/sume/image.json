@@ -1,0 +1,71 @@
+{
+  "source": "Response shape as documented in this spec's notes (from the provider docs); values invented.",
+  "model": "gpt-image-2",
+  "input": {
+    "prompt": "a lighthouse"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.sume.com/v1/image-router/generate",
+        "body": {
+          "model": "gpt-image-2",
+          "prompt": "a lighthouse"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "data": {
+            "job": {
+              "id": "job_img_1"
+            }
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.sume.com/v1/jobs/job_img_1/status"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "data": {
+            "status": "COMPLETED"
+          }
+        }
+      }
+    },
+    {
+      "step": "result",
+      "request": {
+        "method": "GET",
+        "url": "https://api.sume.com/v1/jobs/job_img_1/result"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "data": {
+            "result": {
+              "artifacts": [
+                {
+                  "url": "https://cdn.sume.com/lighthouse.png"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://cdn.sume.com/lighthouse.png"
+    ]
+  }
+}

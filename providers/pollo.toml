@@ -1,0 +1,40 @@
+key = "pollo"
+name = "Pollo AI"
+catalog = ["Pollo"]
+docs = "https://docs.pollo.ai/llms.txt"
+model_hint = "`model` is the generation path after `/v1/generation/` on the model's docs page, e.g. `kling-ai/kling-v3/video` or `pollo-ai/pollojourney-v8-2-image/image`. `input` is that model's `input` object (e.g. `{\"prompt\": \"...\", \"image\": \"https://...\"}`)."
+base_url = "https://pollo.ai/api/platform"
+cost_unit = "USD"
+notes = """
+Per-model submit path POST /v1/generation/{brand}/{model}/{video|image},
+body {input, webhookUrl?}; returns {taskId, status}. Status via
+GET /v1/generation/{taskId}/status: generations[].status is
+waiting | processing | succeed | failed; media in generations[].url
+(kept 14 days). Only the first generation's status/failMsg is checked.
+Errors are non-2xx with {errorCode, message, code}.
+Upload: no upload endpoint documented, and reference image fields accept
+only HTTP(S) URLs ("base64 not allowed"), so the agent must pass public URLs.
+"""
+
+[example]
+model = "kling-ai/kling-v3/video"
+input = { prompt = "a red fox running through snow", image = "https://example.com/fox.png" }
+
+[auth]
+type = "header"
+env = ["POLLO_API_KEY"]
+name = "x-api-key"
+
+[submit]
+url = "/v1/generation/{{model}}"
+body = { input = "{{input}}" }
+capture = { id = "/taskId" }
+
+[poll]
+url = "/v1/generation/{{id}}/status"
+status = "/generations/0/status"
+success = ["succeed"]
+failure = ["failed"]
+error = "/generations/0/failMsg"
+cost = "/costUsd"
+outputs = ["/generations/*/url"]

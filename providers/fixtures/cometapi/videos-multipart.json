@@ -1,0 +1,60 @@
+{
+  "source": "apidoc.cometapi.com /v1/videos: multipart form fields, status queued/in_progress/completed, top-level video_url. Values invented.",
+  "model": "doubao-seedance-2-0",
+  "input": {
+    "prompt": "waves at dusk",
+    "seconds": "8",
+    "input_reference": [
+      "https://example.com/a.png",
+      "https://example.com/b.png"
+    ]
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.cometapi.com/v1/videos",
+        "headers": {
+          "content-type": "multipart/form-data"
+        },
+        "body": {
+          "model": "doubao-seedance-2-0",
+          "prompt": "waves at dusk",
+          "seconds": "8",
+          "input_reference": [
+            "https://example.com/a.png",
+            "https://example.com/b.png"
+          ]
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "task_1",
+          "status": "queued"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.cometapi.com/v1/videos/task_1"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "task_1",
+          "status": "completed",
+          "video_url": "https://cdn.cometapi.test/waves.mp4"
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://cdn.cometapi.test/waves.mp4"
+    ]
+  }
+}

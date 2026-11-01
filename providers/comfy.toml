@@ -1,0 +1,54 @@
+key = "comfy"
+name = "Comfy Router (partner models)"
+catalog = ["Comfy"]
+docs = "https://docs.comfy.org/development/comfy-router/models"
+model_hint = "Comfy Router model id `provider/model`, e.g. `kling/kling-v3`, `bfl/flux-2-pro`, `veo/veo-3.1-generate-001`, `vertexai/gemini-3.1-flash-image`. `input` is that model's native request body from its docs page, e.g. {\"prompt\": \"...\", \"aspect_ratio\": \"16:9\", \"duration\": \"5\", \"mode\": \"std\"} for kling."
+base_url = "https://api.comfy.org"
+cost_unit = "credits"
+notes = "Comfy Router queue API (POST /v2/models/{provider}/{model}/requests). Results are each vendor's native payload with no common envelope; output pointers are verified only for kling, bfl, byteplus, veo and vertexai — other vendors fall back to the top-level `url` heuristic and may need a route. Status has no failure value: a failed run is COMPLETED with `error_type`, and the result call then returns non-2xx. Cost is read from the `X-Comfy-Credits-Used` header of the result response (`header:` pointer); which response carries the header is not documented. No generic upload: reference images go inside `input` as URLs or raw base64 per model schema (bfl wants raw base64). vertexai images default to inline base64 typed by inlineData.mimeType; set `uploadImagesToStorage: true` to get URLs. Comfy Cloud workflow API (cloud.comfy.org/api/prompt) is not modeled: outputs arrive via WebSocket and /api/view redirects."
+
+[auth]
+type = "header"
+env = ["COMFY_API_KEY"]
+name = "X-API-Key"
+
+[submit]
+url = "/v2/models/{{model}}/requests"
+body = "{{input}}"
+capture = { id = "/request_id" }
+
+[poll]
+url = "/v2/models/{{model}}/requests/{{id}}/status"
+status = "/status"
+success = ["COMPLETED"]
+failure = []
+error = "/error_type"
+
+[result]
+url = "/v2/models/{{model}}/requests/{{id}}"
+outputs = [
+  "",
+  "/data/task_result/videos",
+  "/data/task_result/images",
+  "/result/sample",
+  "/content/video_url",
+]
+cost = "header:X-Comfy-Credits-Used"
+
+[[route]]
+models = ["veo/*"]
+[route.result]
+url = "/v2/models/{{model}}/requests/{{id}}"
+outputs = ["/response/videos/*/gcsUri"]
+outputs_base64 = ["/response/videos/*/bytesBase64Encoded"]
+output_mime = "video/mp4"
+cost = "header:X-Comfy-Credits-Used"
+
+[[route]]
+models = ["vertexai/*"]
+[route.result]
+url = "/v2/models/{{model}}/requests/{{id}}"
+outputs = ["/candidates/*/content/parts/*/fileData/fileUri"]
+outputs_base64 = ["/candidates/*/content/parts/*/inlineData"]
+output_mime = "image/png"
+cost = "header:X-Comfy-Credits-Used"

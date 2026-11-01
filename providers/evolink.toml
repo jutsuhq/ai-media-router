@@ -1,0 +1,69 @@
+key = "evolink"
+name = "EvoLink"
+catalog = ["EvoLink"]
+docs = "https://evolink.ai/docs/llms.txt"
+model_hint = "Exact `model` enum value from the model's page in the EvoLink API manual, e.g. `seedance-2.0-image-to-video`, `kling-v4-text-to-video` or `doubao-seedream-5.0-pro`. `input` is that page's body without `model`, flat (e.g. `{\"prompt\": \"...\", \"image_urls\": [\"https://...\"], \"duration\": 5}`). Prefix `image:` (e.g. `image:<model id>`) forces the image endpoint for ids the route globs miss; `video:` forces the video endpoint for ids a glob catches wrongly."
+base_url = "https://api.evolink.ai"
+notes = """
+Video models POST /v1/videos/generations, image models POST
+/v1/images/generations; both return a unified task id polled at
+GET /v1/tasks/{id}. The image route matches the image model families listed
+in the docs (gpt-image, gemini *-image(-preview) = Nano Banana, doubao-seedream,
+mj-*, z-image, qwen-image, wan2.5 *-to-image, krea, grok-imagine-image); a new
+image family not matching these globs is sent to the video endpoint and must
+be added to the route.
+Failed tasks carry `error.code`/`error.message`; HTTP errors are non-2xx with
+`error.{code,message,type}`. Status `pending` is reported upstream as
+`processing`. Result URLs expire, so outputs are downloaded right away.
+Cost: `usage.cost.usd` (only when completed and billing settled).
+Upload: files-api.evolink.ai stream upload (multipart `file`); model pages
+document references as URLs only, data URIs are not documented.
+"""
+
+[auth]
+type = "bearer"
+env = ["EVOLINK_API_KEY"]
+
+[submit]
+url = "/v1/videos/generations"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/id" }
+
+[poll]
+url = "/v1/tasks/{{id}}"
+status = "/status"
+success = ["completed"]
+failure = ["failed"]
+error = "/error/message"
+cost = "/usage/cost/usd"
+outputs = ["/results"]
+
+[[route]]
+strip_prefix = "video:"
+models = ["video:*"]
+
+[[route]]
+strip_prefix = "image:"
+models = [
+  "image:*",
+  "gpt-image-*",
+  "gemini-*-image-preview",
+  "gemini-*-image",
+  "doubao-seedream-*",
+  "mj-*",
+  "z-image-*",
+  "qwen-image*",
+  "*-text-to-image",
+  "*-image-to-image",
+  "krea-*",
+  "grok-imagine-image*",
+]
+[route.submit]
+url = "/v1/images/generations"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/id" }
+
+[upload]
+type = "multipart"
+url = "https://files-api.evolink.ai/api/v1/files/upload/stream"
+result = "/data/file_url"

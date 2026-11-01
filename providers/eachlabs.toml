@@ -1,0 +1,36 @@
+key = "eachlabs"
+name = "each::labs"
+catalog = ["EachLabs"]
+docs = "https://docs.eachlabs.ai/api/models/list-models"
+model_hint = "Model slug from GET /v1/models or the each::labs model pages, e.g. `flux-1-1-pro`. `input` is that model's input object, e.g. {\"prompt\": \"...\", \"aspect_ratio\": \"16:9\"}; media inputs are URLs (`image_url`, `image_urls`)."
+base_url = "https://api.eachlabs.ai"
+notes = "`version` is fixed to \"1.0.0\" as the docs require. Failure status is documented both as `error` (prediction page) and `failed` (index); both are listed. Failure message lives in `output.error_message` (or `logs`). Upload PUT replays every header from `required_headers`. Data URIs are not documented."
+
+[example]
+model = "flux-1-1-pro"
+input = { prompt = "a red fox running through snow", aspect_ratio = "16:9" }
+
+[auth]
+type = "bearer"
+env = ["EACHLABS_API_KEY"]
+
+[submit]
+url = "/v1/prediction"
+body = { model = "{{model}}", version = "1.0.0", input = "{{input}}" }
+capture = { id = "/predictionID" }
+
+[poll]
+url = "/v1/prediction/{{id}}"
+status = "/status"
+success = ["success"]
+failure = ["error", "failed", "cancelled"]
+error = "/output/error_message"
+cost = "/metrics/cost"
+outputs = ["/output"]
+
+[upload]
+type = "put"
+url = "/v1/upload/presign"
+body = { content_type = "{{mime}}" }
+capture = { upload_url = "/presigned_url", file_url = "/public_url" }
+put_headers = "/required_headers"

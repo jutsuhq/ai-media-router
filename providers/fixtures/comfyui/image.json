@@ -1,0 +1,66 @@
+{
+  "source": "ComfyUI server.py: POST /prompt, GET /history/{id} is {} until the prompt finishes; outputs per node as {filename, subfolder, type}; PreviewImage files are type temp. Ids invented.",
+  "model": "sd15-t2i",
+  "env": { "COMFYUI_URL": "http://127.0.0.1:8188" },
+  "input": {
+    "6": { "class_type": "CLIPTextEncode", "inputs": { "text": "a paper boat", "clip": ["4", 1] } },
+    "9": { "class_type": "SaveImage", "inputs": { "filename_prefix": "boat", "images": ["8", 0] } }
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8188/prompt",
+        "body": {
+          "prompt": {
+            "6": { "class_type": "CLIPTextEncode", "inputs": { "text": "a paper boat", "clip": ["4", 1] } },
+            "9": { "class_type": "SaveImage", "inputs": { "filename_prefix": "boat", "images": ["8", 0] } }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": { "prompt_id": "5f0c1e9a-0000-4000-8000-000000000001", "number": 3, "node_errors": {} }
+      }
+    },
+    {
+      "step": "poll",
+      "request": { "method": "GET", "url": "http://127.0.0.1:8188/history/5f0c1e9a-0000-4000-8000-000000000001" },
+      "response": { "status": 200, "body": {} }
+    },
+    {
+      "step": "poll",
+      "request": { "method": "GET", "url": "http://127.0.0.1:8188/history/5f0c1e9a-0000-4000-8000-000000000001" },
+      "response": {
+        "status": 200,
+        "body": {
+          "5f0c1e9a-0000-4000-8000-000000000001": {
+            "prompt": [3, "5f0c1e9a-0000-4000-8000-000000000001", {}, {}, ["9"]],
+            "outputs": {
+              "9": { "images": [{ "filename": "boat_00001_.png", "subfolder": "", "type": "output" }] },
+              "12": { "images": [{ "filename": "ComfyUI_temp_abcd_00001_.png", "subfolder": "", "type": "temp" }] },
+              "15": { "gifs": [{ "filename": "boat clip_00001.mp4", "subfolder": "runs/a", "type": "output", "format": "video/h264-mp4" }] }
+            },
+            "status": {
+              "status_str": "success",
+              "completed": true,
+              "messages": [
+                ["execution_start", { "prompt_id": "5f0c1e9a-0000-4000-8000-000000000001", "timestamp": 1761990000000 }],
+                ["execution_success", { "prompt_id": "5f0c1e9a-0000-4000-8000-000000000001", "timestamp": 1761990004000 }]
+              ]
+            },
+            "meta": {}
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "http://127.0.0.1:8188/view?filename=boat_00001_.png&subfolder=&type=output",
+      "http://127.0.0.1:8188/view?filename=boat%20clip_00001.mp4&subfolder=runs%2Fa&type=output"
+    ],
+    "cost": 0
+  }
+}

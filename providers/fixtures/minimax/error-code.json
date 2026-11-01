@@ -1,0 +1,30 @@
+{
+  "source": "MiniMax reports errors as HTTP 200 with base_resp.status_code != 0 (code 1008 = insufficient balance).",
+  "model": "MiniMax-Hailuo-02",
+  "input": {
+    "prompt": "a lighthouse in a storm",
+    "duration": 6
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.minimax.io/v1/video_generation"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task_id": "",
+          "base_resp": {
+            "status_code": 1008,
+            "status_msg": "insufficient balance"
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "error": "insufficient balance"
+  }
+}

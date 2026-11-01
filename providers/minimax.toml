@@ -1,0 +1,48 @@
+key = "minimax"
+name = "MiniMax (Hailuo video, image-01)"
+catalog = ["MiniMax"]
+docs = "https://platform.minimax.io/docs/api-reference/video-generation-t2v"
+model_hint = "MiniMax video model name, e.g. `MiniMax-Hailuo-2.3` (text-to-video) or `I2V-01` (image-to-video). `input` is the rest of the /v1/video_generation body: `prompt`, optional `first_frame_image` (public URL or data URI), `duration`, `resolution`, `prompt_optimizer`. Image model `image-01` goes to POST /v1/image_generation with `input` = `prompt`, optional `aspect_ratio` (`16:9`…), `width`/`height`, `n` (1-9), `seed`, `prompt_optimizer`, `subject_reference` (`[{type: \"character\", image_file: \"https://...\"}]`). Prefix `image:` or `video:` forces the endpoint."
+base_url = "https://api.minimax.io"
+notes = "Flow: POST /v1/video_generation -> GET /v1/query/video_generation (status Preparing/Queueing/Processing/Success/Fail) -> GET /v1/files/retrieve with the file_id. `file.download_url` appears only in the docs' example response, not in the FileObject schema. Images: POST /v1/image_generation is synchronous and returns `data.image_urls` (expire after 24 h); routed by `image-*` or the `image:` prefix. Keep `response_format` at its default `url`: `data.image_base64` carries no MIME type and is not read. China endpoint is https://api.minimaxi.com (override this file to use it)."
+
+[auth]
+type = "bearer"
+env = ["MINIMAX_API_KEY"]
+
+[errors]
+code = "/base_resp/status_code"
+ok = [0]
+message = "/base_resp/status_msg"
+
+[submit]
+url = "/v1/video_generation"
+body = { "$merge" = "{{input}}", model = "{{model}}" }
+capture = { id = "/task_id" }
+
+[poll]
+url = "/v1/query/video_generation?task_id={{id}}"
+status = "/status"
+success = ["Success"]
+failure = ["Fail"]
+error = "/base_resp/status_msg"
+capture = { file_id = "/file_id" }
+
+[result]
+url = "/v1/files/retrieve?file_id={{file_id}}"
+outputs = ["/file/download_url"]
+
+[[route]]
+strip_prefix = "video:"
+models = ["video:*"]
+
+[[route]]
+strip_prefix = "image:"
+models = ["image:*", "image-*"]
+[route.submit]
+url = "/v1/image_generation"
+body = { "$merge" = "{{input}}", model = "{{model}}" }
+outputs = ["/data/image_urls"]
+
+[upload]
+type = "data_uri"

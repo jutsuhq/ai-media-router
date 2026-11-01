@@ -1,0 +1,20 @@
+name: Feature request
+description: A new operation, provider, or change to how the router behaves.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: The workflow or agent task, and where the router gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The tool, field or behaviour you would add. For a new provider, link its API docs; a TOML spec is usually enough.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

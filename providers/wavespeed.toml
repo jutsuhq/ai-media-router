@@ -1,0 +1,46 @@
+key = "wavespeed"
+name = "WaveSpeedAI"
+catalog = ["WaveSpeed"]
+docs = "https://wavespeed.ai/docs/what-are-predictions"
+model_hint = "Model path from the model's page at wavespeed.ai/models, e.g. `wavespeed-ai/z-image/turbo` or `kwaivgi/kling-v2.1-i2v-pro`. `input` is that model's request body (top-level fields like `prompt`, `image`, `size`)."
+base_url = "https://api.wavespeed.ai"
+notes = """
+Submit is POST /api/v3/<model path> with the input fields at the top level.
+Only `completed` is a successful terminal status. Predictions and uploads are
+deleted after 7 days.
+Upload uses the legacy multipart endpoint /api/v3/media/upload/binary; the
+recommended /api/v3/media/uploads needs the file size and replays signed
+headers on the PUT, which the `put` upload type cannot express.
+"""
+
+[example]
+model = "kwaivgi/kling-v2.1-i2v-pro"
+input = { prompt = "a red fox running through snow", image = "https://example.com/fox.png" }
+
+[auth]
+type = "bearer"
+env = ["WAVESPEED_API_KEY"]
+
+[errors]
+code = "/code"
+ok = [200]
+message = "/message"
+
+[submit]
+url = "/api/v3/{{model}}"
+body = "{{input}}"
+capture = { id = "/data/id" }
+
+[poll]
+url = "/api/v3/predictions/{{id}}/result"
+status = "/data/status"
+success = ["completed"]
+failure = ["failed", "cancelled", "timeout", "deleted"]
+error = "/data/error"
+outputs = ["/data/outputs"]
+
+[upload]
+type = "multipart"
+url = "https://api.wavespeed.ai/api/v3/media/upload/binary"
+file_field = "file"
+result = "/data/download_url"

@@ -1,0 +1,29 @@
+{
+  "source": "ComfyUI execution.py validate_prompt: a class_type that is not registered is missing_node_type with extra_info.class_type. Values invented.",
+  "model": "wan-i2v",
+  "env": { "COMFYUI_URL": "http://127.0.0.1:8188" },
+  "input": {
+    "20": { "class_type": "VHS_VideoCombine", "inputs": { "frame_rate": 16 } }
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": { "method": "POST", "url": "http://127.0.0.1:8188/prompt" },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": {
+            "type": "missing_node_type",
+            "message": "Node 'Video Combine' not found. The custom node may not be installed.",
+            "details": "Node ID '#20'",
+            "extra_info": { "node_id": "20", "class_type": "VHS_VideoCombine", "node_title": "Video Combine" }
+          },
+          "node_errors": {}
+        }
+      }
+    }
+  ],
+  "expect": {
+    "error": "Node 'Video Combine' not found. The custom node may not be installed.; Node ID '#20'; VHS_VideoCombine — fix: install the custom node pack"
+  }
+}

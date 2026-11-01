@@ -1,0 +1,52 @@
+{
+  "source": "`video:` forces generateVideo for an id without `video` in it; values invented.",
+  "model": "video:kling-v2.0",
+  "input": {
+    "prompt": "a lighthouse"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.atlascloud.ai/api/v1/model/generateVideo",
+        "body": {
+          "model": "kling-v2.0",
+          "prompt": "a lighthouse"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "data": {
+            "id": "pred_2"
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.atlascloud.ai/api/v1/model/prediction/pred_2"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "data": {
+            "id": "pred_2",
+            "status": "succeeded",
+            "outputs": [
+              "https://cdn.atlascloud.ai/lighthouse.mp4"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://cdn.atlascloud.ai/lighthouse.mp4"
+    ]
+  }
+}

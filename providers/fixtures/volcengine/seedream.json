@@ -1,0 +1,51 @@
+{
+  "source": "ModelArk image generation API example response (url form; URLs shortened, model/usage as documented).",
+  "model": "doubao-seedream-5-0-pro-260628",
+  "input": {
+    "prompt": "a lighthouse",
+    "size": "2K"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://ark.cn-beijing.volces.com/api/v3/images/generations",
+        "body": {
+          "model": "doubao-seedream-5-0-pro-260628",
+          "prompt": "a lighthouse",
+          "size": "2K"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "model": "doubao-seedream-5-0-pro-260628",
+          "created": 1757388756,
+          "data": [
+            {
+              "url": "https://ark-content-generation.example/1.jpeg",
+              "size": "2720x1536"
+            },
+            {
+              "url": "https://ark-content-generation.example/2.jpeg",
+              "size": "2720x1536"
+            }
+          ],
+          "usage": {
+            "generated_images": 2,
+            "output_tokens": 32640,
+            "total_tokens": 32640
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://ark-content-generation.example/1.jpeg",
+      "https://ark-content-generation.example/2.jpeg"
+    ],
+    "cost": 32640
+  }
+}

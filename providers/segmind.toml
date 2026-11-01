@@ -1,0 +1,39 @@
+key = "segmind"
+name = "Segmind"
+catalog = ["Segmind"]
+docs = "https://docs.segmind.com/docs/serverless-api/async-inference"
+model_hint = "Model slug from segmind.com/models (the part after /v2/), e.g. `seedream-4.5`. `input` is that model's flat request body, e.g. {\"prompt\": \"...\", \"aspect_ratio\": \"1:1\"}."
+base_url = "https://api.segmind.com"
+notes = "Async V2: submit returns QUEUED, /status has no output, full result is fetched once from /v2/requests/{id}. Images are read from `images[].url`, video from `video.url` (`output` duplicates the first URL, so it is not used). Failed inference returns HTTP 422 with `error`. Output URLs on images.segmind.com are public."
+
+[example]
+model = "seedream-4.5"
+input = { prompt = "a red fox running through snow", aspect_ratio = "1:1" }
+
+[auth]
+type = "header"
+env = ["SEGMIND_API_KEY"]
+name = "x-api-key"
+
+[submit]
+url = "/v2/{{model}}"
+body = "{{input}}"
+capture = { id = "/request_id" }
+
+[poll]
+url = "/v2/requests/{{id}}/status"
+status = "/status"
+success = ["COMPLETED"]
+failure = ["FAILED"]
+error = "/error"
+cost = "/metrics/cost"
+
+[result]
+url = "/v2/requests/{{id}}"
+outputs = ["/images", "/video"]
+
+[upload]
+type = "json"
+url = "https://workflows-api.segmind.com/upload-asset"
+body = { data_urls = ["{{data_uri}}"] }
+result = "/file_urls/0"

@@ -1,0 +1,78 @@
+{
+  "source": "Runway API reference: POST /v1/image_to_video returns {id}; GET /v1/tasks/{id}; ids and URLs invented.",
+  "model": "image_to_video",
+  "input": {
+    "model": "gen4_turbo",
+    "promptImage": "https://example.com/cat.png",
+    "promptText": "the cat yawns",
+    "ratio": "1280:720",
+    "duration": 5
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.dev.runwayml.com/v1/image_to_video",
+        "headers": {
+          "authorization": "Bearer <RUNWAYML_API_SECRET>",
+          "x-runway-version": "2024-11-06"
+        },
+        "body": {
+          "model": "gen4_turbo",
+          "promptImage": "https://example.com/cat.png",
+          "promptText": "the cat yawns",
+          "ratio": "1280:720",
+          "duration": 5
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "17f20503-6c24-4c16-946b-35dbbce2af2f"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.dev.runwayml.com/v1/tasks/17f20503-6c24-4c16-946b-35dbbce2af2f"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "17f20503-6c24-4c16-946b-35dbbce2af2f",
+          "status": "RUNNING",
+          "progress": 0.4
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.dev.runwayml.com/v1/tasks/17f20503-6c24-4c16-946b-35dbbce2af2f"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "17f20503-6c24-4c16-946b-35dbbce2af2f",
+          "status": "SUCCEEDED",
+          "output": [
+            "https://dnznrvs05pmza.cloudfront.net/cat.mp4?_jwt=x"
+          ],
+          "cost": {
+            "credits": 25
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://dnznrvs05pmza.cloudfront.net/cat.mp4?_jwt=x"
+    ],
+    "cost": 25
+  }
+}

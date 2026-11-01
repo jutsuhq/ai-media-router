@@ -1,0 +1,48 @@
+key = "openrouter"
+name = "OpenRouter"
+catalog = ["OpenRouter"]
+docs = "https://openrouter.ai/docs/guides/overview/multimodal/video-generation"
+model_hint = "OpenRouter video model slug (list: GET /api/v1/videos/models), e.g. `google/veo-3.1`. `input` is the rest of the /api/v1/videos body: `prompt`, optional `duration`, `resolution`, `aspect_ratio`, `generate_audio`, `seed`, and for image-to-video `frame_images: [{type: \"image_url\", image_url: {url}, frame_type: \"first_frame\"|\"last_frame\"}]` or `input_references: [{type: \"image_url\", image_url: {url}}]`. Image models (list: GET /api/v1/images/models), e.g. `openai/gpt-image-2` or `black-forest-labs/flux.2-pro`, go to POST /api/v1/images with `input` = `prompt`, optional `n`, `resolution` (`1K`, `2K`…), `aspect_ratio`, `quality`, `output_format`, `seed`, `input_references`. Prefix `image:` or `video:` (e.g. `image:<slug>`) forces the endpoint for slugs the route globs miss."
+base_url = "https://openrouter.ai/api/v1"
+cost_unit = "USD"
+download_auth = true
+notes = "Flow: POST /videos (202, status pending) -> GET /videos/{id} (pending/in_progress/completed/failed/cancelled/expired). Outputs are `unsigned_urls`, which require the API key, hence download_auth. Docs show only https URLs in frame_images/input_references; data-URI support is not documented, so no [upload]: agents must pass public URLs. Images: the dedicated POST /images endpoint is synchronous and returns raw base64 in `data[].b64_json` typed by `data[].media_type` (png fallback when omitted), cost in `usage.cost` (USD); a failed generation is HTTP 502 and not billed. Image slugs are routed by globs (gpt-image, gemini *-image*, seedream, flux) or the `image:` prefix; `stream` must stay unset (SSE is not read). Image generation through chat completions (`modalities: [\"image\", \"text\"]`) is not used."
+
+[example]
+model = "google/veo-3.1"
+input = { prompt = "a red fox running through snow", aspect_ratio = "16:9", frame_images = [{ type = "image_url", image_url = { url = "https://example.com/fox.png" }, frame_type = "first_frame" }] }
+
+[auth]
+type = "bearer"
+env = ["OPENROUTER_API_KEY"]
+
+[auth_check]
+url = "/key"
+
+[submit]
+url = "/videos"
+body = { "$merge" = "{{input}}", model = "{{model}}" }
+capture = { id = "/id" }
+
+[poll]
+url = "/videos/{{id}}"
+status = "/status"
+success = ["completed"]
+failure = ["failed", "cancelled", "expired"]
+error = "/error"
+cost = "/usage/cost"
+outputs = ["/unsigned_urls"]
+
+[[route]]
+strip_prefix = "video:"
+models = ["video:*"]
+
+[[route]]
+strip_prefix = "image:"
+models = ["image:*", "*/gpt-image-*", "*/gemini-*-image*", "*seedream*", "black-forest-labs/flux.*"]
+[route.submit]
+url = "/images"
+body = { "$merge" = "{{input}}", model = "{{model}}" }
+cost = "/usage/cost"
+outputs_base64 = ["/data/*"]
+output_mime = "image/png"

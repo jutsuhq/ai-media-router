@@ -1,0 +1,88 @@
+{
+  "source": "Vidu reference2image docs (CN mirror): submit and creations query examples; ids/URLs invented.",
+  "model": "reference2image",
+  "input": {
+    "model": "viduq2",
+    "prompt": "a lighthouse",
+    "aspect_ratio": "16:9",
+    "resolution": "2K"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.vidu.com/ent/v2/reference2image",
+        "body": {
+          "model": "viduq2",
+          "prompt": "a lighthouse",
+          "aspect_ratio": "16:9",
+          "resolution": "2K"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task_id": "8000000000001",
+          "state": "created",
+          "model": "viduq2",
+          "images": [],
+          "prompt": "a lighthouse",
+          "seed": 0,
+          "aspect_ratio": "16:9",
+          "payload": "",
+          "credits": 12,
+          "created_at": "2025-09-08T09:53:22.083033428Z"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.vidu.com/ent/v2/tasks/8000000000001/creations"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "8000000000001",
+          "state": "processing",
+          "err_code": "",
+          "credits": 12,
+          "payload": "",
+          "creations": []
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.vidu.com/ent/v2/tasks/8000000000001/creations"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "8000000000001",
+          "state": "success",
+          "err_code": "",
+          "credits": 12,
+          "payload": "",
+          "creations": [
+            {
+              "id": "c1",
+              "url": "https://prod-ss-images.vidu.com/lighthouse.png",
+              "cover_url": "https://prod-ss-images.vidu.com/lighthouse-cover.png"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://prod-ss-images.vidu.com/lighthouse.png"
+    ],
+    "cost": 12
+  }
+}

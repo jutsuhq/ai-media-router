@@ -1,0 +1,94 @@
+{
+  "source": "Response shapes from docs.kie.ai/market (createTask, recordInfo); ids and URLs invented.",
+  "model": "kling-2.6/image-to-video",
+  "input": {
+    "prompt": "a cat turns its head",
+    "image_urls": [
+      "https://example.com/cat.png"
+    ],
+    "duration": "5"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.kie.ai/api/v1/jobs/createTask",
+        "headers": {
+          "authorization": "Bearer <KIE_API_KEY>",
+          "content-type": "application/json"
+        },
+        "body": {
+          "model": "kling-2.6/image-to-video",
+          "input": {
+            "prompt": "a cat turns its head",
+            "image_urls": [
+              "https://example.com/cat.png"
+            ],
+            "duration": "5"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "msg": "success",
+          "data": {
+            "taskId": "task_kling_1"
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.kie.ai/api/v1/jobs/recordInfo?taskId=task_kling_1"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "msg": "success",
+          "data": {
+            "taskId": "task_kling_1",
+            "model": "kling-2.6/image-to-video",
+            "resultJson": "",
+            "failMsg": "",
+            "creditsConsumed": null,
+            "state": "generating"
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.kie.ai/api/v1/jobs/recordInfo?taskId=task_kling_1"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "msg": "success",
+          "data": {
+            "taskId": "task_kling_1",
+            "model": "kling-2.6/image-to-video",
+            "resultJson": "{\"resultUrls\":[\"https://tempfile.aiquickdraw.com/v/cat.mp4\"]}",
+            "failMsg": "",
+            "creditsConsumed": 55,
+            "state": "success"
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://tempfile.aiquickdraw.com/v/cat.mp4"
+    ],
+    "cost": 55
+  }
+}

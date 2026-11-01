@@ -1,0 +1,51 @@
+key = "vercel"
+name = "Vercel AI Gateway"
+catalog = ["Vercel AI Gateway"]
+docs = "https://vercel.com/docs/ai-gateway/modalities/video-generation"
+model_hint = "AI Gateway video model id (Models page, Video filter), e.g. `google/veo-3.1-generate-001` or `klingai/kling-v3.0-i2v`. `input` is the video-model body: `prompt`, optional `duration`, `aspectRatio` (`16:9`), `resolution` (`1280x720`), `generateAudio`, `seed`, `providerOptions`, and for image-to-video `image` or `frameImages: [{image, frameType: \"first_frame\"|\"last_frame\"}]` / `inputReferences`, where each image is `{type: \"url\", url: \"https://...\"}`. Image models, e.g. `openai/gpt-image-2`, `bfl/flux-2-pro` or `bytedance/seedream-5.0-pro`, go to the OpenAI-compatible POST /v1/images/generations with `input` = `prompt`, optional `n`, `size`; prefix `image:` (or `video:`) forces the endpoint for ids the route globs miss."
+base_url = "https://ai-gateway.vercel.sh/v4/ai"
+notes = "No public REST reference exists; endpoints, headers and response shapes are taken from the @ai-sdk/gateway source (gateway-video-model.ts, gateway-provider.ts, gateway-headers.ts) and the async-generation docs. Flow: POST /video-model/start -> POST /video-model/status with `{operation}` (pending/completed/error/cancelled). The poll body rebuilds the operation as `{gatewayJobId}` from providerMetadata.gateway.asyncJob.jobId, as the docs' webhook example does, instead of echoing the opaque start `operation` value (the spec cannot template a captured object). No cost field in status. Images: the documented REST endpoint https://ai-gateway.vercel.sh/v1/images/generations (synchronous, `response_format: b64_json`, the only format) returns raw `data[].b64_json` with no MIME field, labelled image/png; the docs show no example response, and the video-model headers above are sent on it too (effect unverified). The SDK-only /v4/ai/image-model path is not used. Inline base64 inputs push the persisted start request past its 300 KiB cap (413), so no [upload]: pass hosted URLs."
+
+[example]
+model = "klingai/kling-v3.0-i2v"
+input = { prompt = "a red fox running through snow", duration = 5, image = { type = "url", url = "https://example.com/fox.png" } }
+
+[auth]
+type = "bearer"
+env = ["AI_GATEWAY_API_KEY"]
+
+[headers]
+"ai-gateway-protocol-version" = "0.0.1"
+"ai-gateway-auth-method" = "api-key"
+"ai-video-model-specification-version" = "4"
+"ai-model-id" = "{{model}}"
+
+[submit]
+url = "/video-model/start"
+body = { n = 1, "$merge" = "{{input}}" }
+capture = { id = "/providerMetadata/gateway/asyncJob/jobId" }
+
+[poll]
+method = "POST"
+url = "/video-model/status"
+body = { operation = { gatewayJobId = "{{id}}" } }
+status = "/status"
+success = ["completed"]
+failure = ["error", "cancelled"]
+error = "/error"
+outputs = ["/videos"]
+outputs_base64 = ["/videos/*/data"]
+output_mime = "video/mp4"
+
+[[route]]
+strip_prefix = "video:"
+models = ["video:*"]
+
+[[route]]
+strip_prefix = "image:"
+models = ["image:*", "*/gpt-image-*", "bfl/*", "*seedream*", "google/imagen-*"]
+[route.submit]
+url = "https://ai-gateway.vercel.sh/v1/images/generations"
+body = { model = "{{model}}", response_format = "b64_json", "$merge" = "{{input}}" }
+outputs_base64 = ["/data/*"]
+output_mime = "image/png"

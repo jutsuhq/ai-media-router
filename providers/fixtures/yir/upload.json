@@ -1,0 +1,82 @@
+{
+  "source": "yir.ai/docs/reference/files: create-files plan, PUT the single part, complete with {}; ids and URLs invented.",
+  "upload": {
+    "file_name": "ref.png",
+    "mime": "image/png"
+  },
+  "exchanges": [
+    {
+      "step": "upload",
+      "request": {
+        "method": "POST",
+        "url": "https://gateway.yir.ai/v1/files",
+        "body": {
+          "files": [
+            {
+              "name": "ref.png",
+              "media_type": "image/png",
+              "size": 7
+            }
+          ]
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "files": [
+            {
+              "id": "file_6f1c2a7e-0000-4000-8000-000000000001",
+              "object": "file",
+              "status": "pending_upload",
+              "name": "ref.png",
+              "media_type": "image/png",
+              "size": 7,
+              "upload": {
+                "type": "single",
+                "parts": [
+                  {
+                    "part_number": 1,
+                    "size": 7,
+                    "url": "https://uploads.yir.test/p1?sig=x"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "step": "upload_put",
+      "request": {
+        "method": "PUT",
+        "url": "https://uploads.yir.test/p1?sig=x",
+        "headers": {
+          "content-type": "image/png"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": ""
+      }
+    },
+    {
+      "step": "upload_complete",
+      "request": {
+        "method": "POST",
+        "url": "https://gateway.yir.ai/v1/files/file_6f1c2a7e-0000-4000-8000-000000000001/complete",
+        "body": {}
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "file_6f1c2a7e-0000-4000-8000-000000000001",
+          "status": "processing"
+        }
+      }
+    }
+  ],
+  "expect": {
+    "reference": "file_6f1c2a7e-0000-4000-8000-000000000001"
+  }
+}

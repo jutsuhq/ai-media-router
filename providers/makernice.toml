@@ -1,0 +1,51 @@
+key = "makernice"
+name = "Makernice"
+catalog = ["Makernice"]
+docs = "https://makernice.com/docs"
+model_hint = "Model id from GET https://api.makernice.com/v1/models, e.g. `seedance-2.5`. `input` is the generation input without `model`: `{\"mode\": \"t2v\", \"prompt\": \"…\", \"duration\": 5, \"resolution\": \"720p\"}`; image modes are `t2i`/`i2i` (no `duration`). The price quote is requested automatically."
+base_url = "https://api.makernice.com"
+cost_unit = "USD"
+cost_multiplier = 0.000001
+download_auth = true
+notes = """
+Flow: [prepare] POST /v1/generations/quote with the flat input (model, mode,
+prompt, …) returns a quote `id` (valid 12 min, single use) -> POST
+/v1/generations {quote_id, input} with the same input -> GET
+/v1/generations/{id}. Idempotency-Key (required on create) is the per-job
+uuid, sent on submit only.
+outputs[].url is relative (/v1/generations/gen_…/outputs/0); relative output
+URLs resolve against base_url and are downloaded with the API key (the
+endpoint answers 302 to the file).
+Status values: queued, generating, moderating, checking (running);
+succeeded; failed, canceled. `amount` is micro-USD as a string, scaled to USD.
+No upload endpoint: reference images must be public https URLs
+(JPEG/PNG/WebP, max 10 MB, no redirects).
+"""
+
+[example]
+model = "seedance-2.5"
+input = { mode = "t2v", prompt = "a red fox running through snow", duration = 5, resolution = "720p" }
+
+[auth]
+type = "bearer"
+env = ["MAKERNICE_API_KEY"]
+
+[prepare]
+url = "/v1/generations/quote"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { quote_id = "/id" }
+
+[submit]
+url = "/v1/generations"
+headers = { "Idempotency-Key" = "{{uuid}}" }
+body = { quote_id = "{{quote_id}}", input = { model = "{{model}}", "$merge" = "{{input}}" } }
+capture = { id = "/id" }
+
+[poll]
+url = "/v1/generations/{{id}}"
+status = "/status"
+success = ["succeeded"]
+failure = ["failed", "canceled"]
+error = "/error/message"
+cost = "/amount"
+outputs = ["/outputs"]

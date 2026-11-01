@@ -1,0 +1,54 @@
+{
+  "source": "Interactions API image call is synchronous and returns only output steps (spec notes); base64 shortened.",
+  "model": "gemini-3-pro-image",
+  "input": {
+    "input": [
+      {
+        "type": "text",
+        "text": "a lighthouse"
+      }
+    ]
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/interactions",
+        "body": {
+          "model": "gemini-3-pro-image",
+          "input": [
+            {
+              "type": "text",
+              "text": "a lighthouse"
+            }
+          ]
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "int_1",
+          "status": "completed",
+          "steps": [
+            {
+              "type": "model_output",
+              "content": [
+                {
+                  "type": "image",
+                  "data": "aGk=",
+                  "mime_type": "image/png"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "inline:image/png:2"
+    ]
+  }
+}

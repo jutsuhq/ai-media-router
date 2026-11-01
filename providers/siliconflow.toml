@@ -1,0 +1,45 @@
+key = "siliconflow"
+name = "SiliconFlow"
+catalog = ["SiliconFlow"]
+docs = "https://docs.siliconflow.com/en/api-reference/videos/videos_submit"
+model_hint = "Video model id from the SiliconFlow video submit docs, e.g. `Wan-AI/Wan2.2-T2V-A14B` or `Wan-AI/Wan2.2-I2V-A14B`. `input` holds the other body fields: `prompt`, `image_size` (`1280x720`, `720x1280`, `960x960`), optional `negative_prompt`, `seed`, and for I2V `image` (URL or `data:image/png;base64,...`). Image models, e.g. `Qwen/Qwen-Image` or `black-forest-labs/FLUX.2-pro`, go to POST /v1/images/generations with `input` = `prompt`, optional `negative_prompt`, `image_size` (`1328x1328`), `batch_size`, `seed`, `num_inference_steps`, `guidance_scale`, `image` (data URI, edit models). Prefix `image:` or `video:` forces the endpoint for ids the route globs miss."
+base_url = "https://api.siliconflow.com/v1"
+notes = "Images: POST /v1/images/generations is synchronous and returns `images[].url` (valid 1 h); routed by globs (Qwen-Image, Z-Image, FLUX, Kolors) or the `image:` prefix. The docs give only the response schema, no example; body fields differ per model (oneOf). Video status is polled with POST, not GET. Output links expire (docs say 10 min on submit page, 1 h on status page); download immediately."
+
+[example]
+model = "Wan-AI/Wan2.2-I2V-A14B"
+input = { prompt = "a red fox running through snow", image_size = "1280x720", image = "https://example.com/fox.png" }
+
+[auth]
+type = "bearer"
+env = ["SILICONFLOW_API_KEY"]
+
+[submit]
+url = "/video/submit"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/requestId" }
+
+[poll]
+method = "POST"
+url = "/video/status"
+body = { requestId = "{{id}}" }
+status = "/status"
+success = ["Succeed"]
+failure = ["Failed"]
+error = "/reason"
+outputs = ["/results/videos"]
+
+[[route]]
+strip_prefix = "video:"
+models = ["video:*"]
+
+[[route]]
+strip_prefix = "image:"
+models = ["image:*", "Qwen/Qwen-Image*", "Tongyi-MAI/Z-Image*", "black-forest-labs/FLUX.*", "Kwai-Kolors/*"]
+[route.submit]
+url = "/images/generations"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+outputs = ["/images"]
+
+[upload]
+type = "data_uri"

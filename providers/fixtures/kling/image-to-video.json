@@ -1,0 +1,128 @@
+{
+  "source": "kling.ai/document-api 2-6/image-to-video: create and GET /tasks example responses; ids, URLs and amounts invented.",
+  "model": "image-to-video/kling-2.6",
+  "input": {
+    "contents": [
+      {
+        "type": "text",
+        "text": "the cat turns its head"
+      },
+      {
+        "type": "image",
+        "url": "https://example.com/cat.png"
+      }
+    ],
+    "settings": {
+      "resolution": "1080p",
+      "duration": "5"
+    }
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api-singapore.klingai.com/image-to-video/kling-2.6",
+        "headers": {
+          "authorization": "Bearer <KLING_API_KEY>"
+        },
+        "body": {
+          "contents": [
+            {
+              "type": "text",
+              "text": "the cat turns its head"
+            },
+            {
+              "type": "image",
+              "url": "https://example.com/cat.png"
+            }
+          ],
+          "settings": {
+            "resolution": "1080p",
+            "duration": "5"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "message": "success",
+          "request_id": "r1",
+          "data": {
+            "id": "893605946402811985",
+            "status": "submitted"
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api-singapore.klingai.com/tasks?task_ids=893605946402811985"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "message": "success",
+          "request_id": "r2",
+          "data": [
+            {
+              "id": "893605946402811985",
+              "status": "processing",
+              "message": "",
+              "external_id": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api-singapore.klingai.com/tasks?task_ids=893605946402811985"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "message": "success",
+          "request_id": "r2",
+          "data": [
+            {
+              "id": "893605946402811985",
+              "status": "succeeded",
+              "message": "",
+              "external_id": "",
+              "outputs": [
+                {
+                  "type": "video",
+                  "id": "o1",
+                  "url": "https://cdn.klingai.com/kling/893605946402811985.mp4",
+                  "watermark_url": "https://cdn.klingai.com/kling/893605946402811985-wm.mp4",
+                  "duration": "5"
+                }
+              ],
+              "billing": [
+                {
+                  "charge_type": "usage",
+                  "amount": "0.35",
+                  "currency": "USD"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://cdn.klingai.com/kling/893605946402811985.mp4"
+    ],
+    "cost": 0.35
+  }
+}

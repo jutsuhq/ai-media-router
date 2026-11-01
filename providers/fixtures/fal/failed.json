@@ -1,0 +1,49 @@
+{
+  "source": "fal reports a failed request as COMPLETED with `error` set (see spec notes).",
+  "model": "fal-ai/flux/schnell",
+  "input": {
+    "prompt": "a red fox"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://queue.fal.run/fal-ai/flux/schnell",
+        "headers": {
+          "authorization": "Key <FAL_KEY>"
+        },
+        "body": {
+          "prompt": "a red fox"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "request_id": "764cabcf",
+          "response_url": "https://queue.fal.run/fal-ai/flux/requests/764cabcf",
+          "status_url": "https://queue.fal.run/fal-ai/flux/requests/764cabcf/status",
+          "cancel_url": "https://queue.fal.run/fal-ai/flux/requests/764cabcf/cancel"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://queue.fal.run/fal-ai/flux/requests/764cabcf/status"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "COMPLETED",
+          "error": "Invalid image_size",
+          "error_type": "validation_error"
+        }
+      }
+    }
+  ],
+  "expect": {
+    "error": "Invalid image_size"
+  }
+}

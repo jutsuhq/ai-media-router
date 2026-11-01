@@ -1,0 +1,63 @@
+{
+  "source": "Response shape as documented in this spec's notes (from the provider docs); values invented.",
+  "model": "openai/gpt-image-2",
+  "input": {
+    "input": {
+      "type": "text",
+      "prompt": "a lighthouse"
+    }
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://gateway.yir.ai/v1/images/generations",
+        "body": {
+          "model": "openai/gpt-image-2",
+          "input": {
+            "type": "text",
+            "prompt": "a lighthouse"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "job_img_1",
+          "status": "queued"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://gateway.yir.ai/v1/jobs/job_img_1"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "job_img_1",
+          "status": "succeeded",
+          "result": {
+            "files": [
+              {
+                "url": "https://files.yir.ai/lighthouse.png"
+              }
+            ]
+          },
+          "billing": {
+            "total_charged_by_yir": 0.04
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://files.yir.ai/lighthouse.png"
+    ],
+    "cost": 0.04
+  }
+}

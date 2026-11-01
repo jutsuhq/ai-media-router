@@ -1,0 +1,55 @@
+{
+  "source": "302.AI V2 image fetch failure example (shortened).",
+  "model": "image:baidu-irag-t2i",
+  "input": {
+    "prompt": "remove dog"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.302.ai/302/v2/image/generate?run_async=true",
+        "body": {
+          "model": "baidu-irag-t2i",
+          "prompt": "remove dog"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task_id": "8b94926f-0000-4000-8000-000000000002",
+          "status": "pending",
+          "created_at": "2025-08-19T11:10:13.162917Z"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.302.ai/302/v2/image/fetch/8b94926f-0000-4000-8000-000000000002"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "failed",
+          "model": "baidu-irag-t2i",
+          "error": {
+            "error": "Task failed",
+            "message": "Network error after 5 retries: ",
+            "error_type": "TimeoutError",
+            "attempts": 15,
+            "execution_time": 703.53,
+            "is_network_error": true
+          },
+          "task_id": "8b94926f-0000-4000-8000-000000000002",
+          "task_type": "image"
+        }
+      }
+    }
+  ],
+  "expect": {
+    "error": "Network error after 5 retries"
+  }
+}

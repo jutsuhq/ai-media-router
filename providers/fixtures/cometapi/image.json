@@ -1,0 +1,49 @@
+{
+  "source": "CometAPI /v1/images/generations sync example response (gpt-image, base64 shortened to 'hi').",
+  "model": "gpt-image-2",
+  "input": {
+    "prompt": "a lighthouse",
+    "size": "1024x1024",
+    "quality": "low"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.cometapi.com/v1/images/generations",
+        "body": {
+          "model": "gpt-image-2",
+          "prompt": "a lighthouse",
+          "size": "1024x1024",
+          "quality": "low"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "created": 1781075000,
+          "background": "opaque",
+          "output_format": "png",
+          "quality": "low",
+          "size": "1024x1024",
+          "usage": {
+            "input_tokens": 13,
+            "output_tokens": 196,
+            "total_tokens": 209
+          },
+          "data": [
+            {
+              "b64_json": "aGk="
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "inline:image/png:2"
+    ]
+  }
+}

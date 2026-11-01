@@ -1,0 +1,43 @@
+{
+  "source": "xAI images reference: example {data:[{url}]} plus documented mime_type and usage.cost_in_usd_ticks; values invented.",
+  "model": "grok-imagine-image-2.0",
+  "input": {
+    "prompt": "a lighthouse",
+    "resolution": "1k"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.x.ai/v1/images/generations",
+        "body": {
+          "model": "grok-imagine-image-2.0",
+          "response_format": "url",
+          "prompt": "a lighthouse",
+          "resolution": "1k"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "data": [
+            {
+              "url": "https://imgen.x.ai/xai-imgen/lighthouse.jpeg",
+              "mime_type": "image/jpeg"
+            }
+          ],
+          "usage": {
+            "cost_in_usd_ticks": 200000000
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://imgen.x.ai/xai-imgen/lighthouse.jpeg"
+    ],
+    "cost": 0.02
+  }
+}

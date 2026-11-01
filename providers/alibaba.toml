@@ -1,0 +1,49 @@
+key = "alibaba"
+name = "Alibaba Cloud Model Studio (international)"
+catalog = ["Alibaba Cloud"]
+docs = "https://www.alibabacloud.com/help/en/model-studio/text-to-video-api-reference"
+model_hint = "`model` is a Model Studio model id, e.g. `wan2.7-t2v`, `wan2.6-i2v`, `wan2.6-t2i` or `wan2.5-t2i-preview`, `wan2.7-image`, `qwen-image-3.0-pro` (images). `input` is `{input: {...}, parameters: {...}}` exactly as in the model's API reference, e.g. `{input:{prompt, img_url?}, parameters:{resolution:\"1080P\", duration:5}}` (wan2.7-i2v uses `input.media` = `[{type:\"first_frame\", url}]`; wan2.6-t2i, wan2.7-image and qwen-image-3.0 use `input.messages` = `[{role: \"user\", content: [{text}, {image}?]}]` with `parameters` such as `size`, `n`, `watermark`). Prefix `image:` sends any id to the image-generation endpoint."
+base_url = "https://dashscope-intl.aliyuncs.com/api/v1"
+notes = "Singapore region via the legacy domain, which Alibaba says remains functional; the docs now prefer `https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1` and show wan2.7 only on that host — if wan2.7 fails here, save an override (save_spec) with base_url = \"https://{{env.DASHSCOPE_WORKSPACE_ID}}.ap-southeast-1.maas.aliyuncs.com/api/v1\" and set DASHSCOPE_WORKSPACE_ID: base_url is a template. Task ids and output URLs expire after 24 h (status UNKNOWN). Routes cover video-synthesis (default), old text2image (wan2.5 and earlier) and image-generation (wan2.6-t2i, wan2.7-image*, qwen-image-3*, or any id prefixed `image:`; async variant of the documented multimodal-generation call, outputs output.choices[].message.content[].image); qwen-image-2.x documents only the synchronous multimodal-generation call, which the global X-DashScope-Async header conflicts with, so it is not routed; other Wan endpoints (e.g. speech-to-video image2video) are not routed. Data URIs are documented for image inputs only."
+
+[example]
+model = "wan2.6-i2v"
+input = { input = { prompt = "a red fox running through snow", img_url = "https://example.com/fox.png" }, parameters = { resolution = "1080P", duration = 5 } }
+
+[auth]
+type = "bearer"
+env = ["DASHSCOPE_API_KEY"]
+
+[headers]
+"X-DashScope-Async" = "enable"
+
+[submit]
+url = "/services/aigc/video-generation/video-synthesis"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/output/task_id" }
+
+[poll]
+url = "/tasks/{{id}}"
+status = "/output/task_status"
+success = ["SUCCEEDED"]
+failure = ["FAILED", "CANCELED", "UNKNOWN"]
+error = "/output/message"
+outputs = ["/output/video_url", "/output/results/*/url", "/output/choices/*/message/content/*/image"]
+
+[upload]
+type = "data_uri"
+
+[[route]]
+models = ["wan2.5-t2i*", "wan2.2-t2i*", "wan2.1-t2i*"]
+[route.submit]
+url = "/services/aigc/text2image/image-synthesis"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/output/task_id" }
+
+[[route]]
+strip_prefix = "image:"
+models = ["image:*", "wan2.6-t2i*", "wan2.7-image*", "qwen-image-3*"]
+[route.submit]
+url = "/services/aigc/image-generation/generation"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/output/task_id" }

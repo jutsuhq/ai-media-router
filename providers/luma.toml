@@ -1,0 +1,35 @@
+key = "luma"
+name = "Luma"
+catalog = ["Luma", "Luma AI"]
+docs = "https://docs.agents.lumalabs.ai/api/resources/generations/methods/create/"
+model_hint = "Model id: `ray-3.2` (video) or `uni-1` / `uni-1-max` (image). `input` is the rest of the POST /v1/generations body and must include `type` and `prompt`, e.g. `{\"type\": \"video\", \"prompt\": \"...\", \"aspect_ratio\": \"16:9\", \"video\": {\"duration\": \"5s\", \"resolution\": \"720p\", \"start_frame\": {\"url\": \"https://...\"}}}`. For images: `{\"type\": \"image\", \"prompt\": \"...\", \"aspect_ratio\": \"16:9\", \"output_format\": \"png\", \"image_ref\": [{\"url\": \"https://...\"}]}` with model `uni-1` or `uni-1-max` (`type: \"image_edit\"` edits). An uploaded library file is referenced as `{\"file_id\": \"<value returned by upload>\"}`, not as `url`."
+base_url = "https://agents.lumalabs.ai/v1"
+notes = "Uses the Luma Agents API (docs.lumalabs.ai points here as the current Dream Machine API). Upload returns a file id, not a URL; upload_asset says so in `usage`: wrap it as ImageRef `{file_id}`. The multipart upload returns the file in `pending` ingest state; whether a generation waits for `ready` is not documented. Inline `{data, media_type}` ImageRefs exist but need raw base64 plus a separate MIME field, which `data_uri` upload cannot produce. Images use the same generations flow (states queued, processing, completed, failed); `output` is an array of `{type: \"image\", url}` objects. Failures carry `failure_reason` and `failure_code`. No cost field in the Generation object. Output URLs are presigned and expire after 1 hour."
+
+[example]
+model = "ray-3.2"
+input = { type = "video", prompt = "a red fox running through snow", aspect_ratio = "16:9", video = { duration = "5s", resolution = "720p", start_frame = { url = "https://example.com/fox.png" } } }
+
+[auth]
+type = "bearer"
+env = ["LUMA_API_KEY"]
+
+[submit]
+url = "/generations"
+body = { model = "{{model}}", "$merge" = "{{input}}" }
+capture = { id = "/id" }
+
+[poll]
+url = "/generations/{{id}}"
+status = "/state"
+success = ["completed"]
+failure = ["failed"]
+error = "/failure_reason"
+outputs = ["/output"]
+
+[upload]
+type = "multipart"
+url = "/files"
+file_field = "file"
+result = "/id"
+usage = "Reference it as {\"file_id\": \"<reference>\"} wherever the body takes an ImageRef, e.g. video.start_frame."

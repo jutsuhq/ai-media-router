@@ -1,0 +1,48 @@
+{
+  "source": "DeepInfra FLUX-1-schnell native inference out_example (data URI shortened to 'hi').",
+  "model": "black-forest-labs/FLUX-1-schnell",
+  "input": {
+    "prompt": "a lighthouse",
+    "num_images": 1
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.deepinfra.com/v1/inference/black-forest-labs/FLUX-1-schnell",
+        "body": {
+          "prompt": "a lighthouse",
+          "num_images": 1
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "images": [
+            "data:image/png;base64,aGk="
+          ],
+          "nsfw_content_detected": [
+            false
+          ],
+          "seed": 42,
+          "request_id": null,
+          "inference_status": {
+            "status": "succeeded",
+            "runtime_ms": 812,
+            "cost": 0.0005,
+            "tokens_generated": 0,
+            "tokens_input": 0,
+            "output_length": 0
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "inline:image/png:2"
+    ],
+    "cost": 0.0005
+  }
+}

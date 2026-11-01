@@ -1,0 +1,52 @@
+{
+  "source": "Response shape as documented in this spec's notes (from the provider docs); values invented.",
+  "model": "bytedance/seedream-v4.7/text-to-image",
+  "input": {
+    "prompt": "a lighthouse"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.atlascloud.ai/api/v1/model/generateImage",
+        "body": {
+          "model": "bytedance/seedream-v4.7/text-to-image",
+          "prompt": "a lighthouse"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "data": {
+            "id": "pred_1"
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://api.atlascloud.ai/api/v1/model/prediction/pred_1"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "data": {
+            "id": "pred_1",
+            "status": "completed",
+            "outputs": [
+              "https://cdn.atlascloud.ai/lighthouse.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://cdn.atlascloud.ai/lighthouse.png"
+    ]
+  }
+}

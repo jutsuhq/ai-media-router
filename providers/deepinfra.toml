@@ -1,0 +1,21 @@
+key = "deepinfra"
+name = "DeepInfra"
+catalog = ["DeepInfra"]
+docs = "https://docs.deepinfra.com/apis/text-to-video"
+model_hint = "DeepInfra model name as in its URL deepinfra.com/<model>, e.g. `Wan-AI/Wan2.2-T2V-A14B` or `google/veo-3.1-fast`. `input` is that model's native inference body from its /api page, at minimum `{prompt}`; image models (e.g. `stabilityai/sdxl-turbo`) work too."
+base_url = "https://api.deepinfra.com"
+notes = "Uses the synchronous native API POST /v1/inference/{model}: the request stays open until the video is ready and returns it as a data URI in `video_url` (`videos` on some model pages, `images` for image models); cost is read from inference_status.cost. An async job API exists (POST /v1/videos with image_url accepting URL or data URI, GET /v1/videos/{id}, GET /v1/videos/{id}/content) but its docs list no status values and no output fields, so it is not wired. Native async (`webhook` param) delivers results only to a webhook, with no polling endpoint. Image-input field names differ per model, so no [upload]."
+
+[example]
+model = "Wan-AI/Wan2.2-T2V-A14B"
+input = { prompt = "a red fox running through snow" }
+
+[auth]
+type = "bearer"
+env = ["DEEPINFRA_API_KEY"]
+
+[submit]
+url = "/v1/inference/{{model}}"
+body = "{{input}}"
+outputs = ["/video_url", "/videos", "/images"]
+cost = "/inference_status/cost"

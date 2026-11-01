@@ -1,0 +1,46 @@
+{
+  "source": "OpenRouter POST /api/v1/images docs example response (base64 shortened to 'hi').",
+  "model": "openai/gpt-image-2",
+  "input": {
+    "prompt": "a lighthouse",
+    "aspect_ratio": "16:9"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/images",
+        "body": {
+          "model": "openai/gpt-image-2",
+          "prompt": "a lighthouse",
+          "aspect_ratio": "16:9"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "created": 1748372400,
+          "data": [
+            {
+              "b64_json": "aGk=",
+              "media_type": "image/png"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 0,
+            "completion_tokens": 4175,
+            "total_tokens": 4175,
+            "cost": 0.04
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "inline:image/png:2"
+    ],
+    "cost": 0.04
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "source": "Together images API (sync, data[].url); `image:` forces the image route for an id no glob matches. Values invented.",
+  "model": "image:acme/brand-new-image-model",
+  "input": {
+    "prompt": "a lighthouse"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://api.together.ai/v1/images/generations",
+        "body": {
+          "model": "acme/brand-new-image-model",
+          "response_format": "url",
+          "prompt": "a lighthouse"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "id": "img_1",
+          "data": [
+            {
+              "index": 0,
+              "url": "https://api.together.ai/imgproxy/lighthouse.png"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://api.together.ai/imgproxy/lighthouse.png"
+    ]
+  }
+}
