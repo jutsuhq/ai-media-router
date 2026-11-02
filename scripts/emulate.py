@@ -536,6 +536,7 @@ class AccountHandler(BaseHTTPRequestHandler):
             return self.send(405, {"error": "method not allowed"})
         if self.command == "DELETE":
             return self.send(200, body={})
+        raw = self._body()  # read before a 401 too: a keep-alive connection must not keep the unread body
         auth = self.headers.get("authorization") or ""
         token = auth[7:] if auth[:7].lower() == "bearer " else ""
         with server.lock:
@@ -545,7 +546,7 @@ class AccountHandler(BaseHTTPRequestHandler):
                 "WWW-Authenticate": f'Bearer resource_metadata="{B}/.well-known/oauth-protected-resource/mcp", '
                                     f'scope="openid email offline_access"'})
         try:
-            msg = json.loads(self._body())
+            msg = json.loads(raw)
         except Exception:
             with server.lock:
                 server.unexpected.append("mcp: body is not JSON")
