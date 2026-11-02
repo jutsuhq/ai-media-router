@@ -18,7 +18,7 @@ use crate::{
     jobs::{self, Job, Retry, SaveTo, batches::{self, Batch}, failures::ErrorKind, preflight::{self, Doctor, DoctorParams, Preflight}, reuse, stats::{self, ModelStats}},
     library::{assets::{self, Asset, ReviewFilter, ReviewStatus}, collections::{self, Collection, Export}, embeddings::{self, Similar}, lineage::{self, Lineage}, media::{self, Edited, FrameAt, Op, ReframeMode}, provenance::Imported, references::{self, Kind, Reference}},
     pricing::{budgets::{self, Budget}, catalog::{self, PriceRow}, costs::{self, Estimate, StepEstimate}},
-    providers::{Origin, Provider, Registry, SpecProblem, builtin_spec, exchange::{Exchange, Trace}, fixtures::{self, Fixture, FixtureResult}, spec::{AuthKind, Spec}},
+    providers::{Origin, Provider, Registry, SpecProblem, builtin_spec, exchange::{Exchange, Trace}, fixtures::{self, Fixture, FixtureResult}, oauth, spec::{AuthKind, Spec}},
     templates::{prompts::{self, PromptInfo, PromptText}, recipes::{self, Recipe, Snippet, Step, Variable}},
 };
 
@@ -75,6 +75,12 @@ pub struct ProviderInfo {
     pub source: String,
     /// Spec file: `providers/<key>.toml` in the repo, or the override path.
     pub spec_path: String,
+    /// For an OAuth provider: whether the account is signed in (null otherwise).
+    pub signed_in: Option<bool>,
+    /// The signed-in account's email (null otherwise).
+    pub account: Option<String>,
+    /// The sign-in command for an OAuth provider (null otherwise).
+    pub login_command: Option<String>,
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -90,6 +96,10 @@ pub struct KeyStatus {
     pub masked: Option<String>,
     /// For the user to run in a terminal, e.g. `ai-media-router keys set KIE_API_KEY`.
     pub set_command: String,
+    /// For an OAuth session slot: whether the account is signed in (null for plain keys).
+    pub signed_in: Option<bool>,
+    /// The signed-in account's email (null for plain keys).
+    pub account: Option<String>,
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -695,6 +705,13 @@ pub fn list_providers(app: &App) -> Providers {
 pub fn get_provider(app: &App, p: ProviderParams) -> Result<ProviderInfo> {
     let provider = app.find_provider(&p.provider)?;
     let s = &provider.spec;
+    let (signed_in, account, login_command) = if s.auth.kind == AuthKind::Oauth {
+        let name = s.auth.env.first().map(String::as_str).unwrap_or("");
+        let status = oauth::status(app.env().get(name));
+        (Some(status.signed_in), status.email, Some(login_command(app, &s.key)))
+    } else {
+        (None, None, None)
+    };
     Ok(ProviderInfo {
         key: s.key.clone(),
         name: s.name.clone(),
@@ -710,6 +727,9 @@ pub fn get_provider(app: &App, p: ProviderParams) -> Result<ProviderInfo> {
         notes: s.notes.clone(),
         source: provider.origin.kind().to_owned(),
         spec_path: provider.origin.path(),
+        signed_in,
+        account,
+        login_command,
     })
 }
 
@@ -736,8 +756,29 @@ fn providers_reading_keys(registry: &Registry) -> BTreeMap<String, Vec<String>> 
     uses
 }
 
+/// The provider key whose oauth `[auth] env` slot is `name`, if any.
+fn oauth_provider_key(app: &App, name: &str) -> Option<String> {
+    app.registry()
+        .iter()
+        .find(|p| p.spec.auth.kind == AuthKind::Oauth && p.spec.auth.env.iter().any(|e| e == name))
+        .map(|p| p.spec.key.clone())
+}
+
+/// The sign-in command for an OAuth provider, with `--home` like the other hints.
+fn login_command(app: &App, key: &str) -> String {
+    let mut command = format!("ai-media-router login {key}");
+    if default_home().as_deref() != Some(app.home.as_path()) {
+        command.push_str(&format!(" --home '{}'", app.home.display()));
+    }
+    command
+}
+
 /// The `keys set` command for `name`, with `--home` when this process uses a non-default directory.
+/// An OAuth session slot gets its `login` command instead.
 pub fn set_command(app: &App, name: &str) -> String {
+    if let Some(key) = oauth_provider_key(app, name) {
+        return login_command(app, &key);
+    }
     let mut command = format!("ai-media-router keys set {name}");
     if default_home().as_deref() != Some(app.home.as_path()) {
         command.push_str(&format!(" --home '{}'", app.home.display()));
@@ -772,13 +813,22 @@ pub fn list_keys(app: &App) -> Result<Keys> {
             } else {
                 None
             };
+            let is_oauth = oauth_provider_key(app, &name).is_some();
+            let (signed_in, account) = if is_oauth {
+                let status = oauth::status(value);
+                (Some(status.signed_in), status.email)
+            } else {
+                (None, None)
+            };
             KeyStatus {
                 name,
                 providers,
                 set: value.is_some(),
                 source: source.map(str::to_owned),
-                masked: value.map(config::mask),
+                masked: if is_oauth { None } else { value.map(config::mask) },
                 set_command: command,
+                signed_in,
+                account,
             }
         })
         .collect();
@@ -789,6 +839,35 @@ pub fn list_keys(app: &App) -> Result<Keys> {
          checks a key without spending."
     );
     Ok(Keys { keys, config_file: config_file.display().to_string(), warnings, hint })
+}
+
+#[derive(Serialize, JsonSchema)]
+pub struct LoginResult {
+    pub provider: String,
+    pub email: Option<String>,
+}
+
+#[derive(Serialize, JsonSchema)]
+pub struct LogoutResult {
+    pub provider: String,
+    pub signed_out: bool,
+}
+
+/// Signs an OAuth provider in. CLI-only: it opens a browser and listens on a loopback port, so it
+/// cannot run inside MCP or REST.
+pub async fn login(app: &App, provider: &str, open_browser: bool, store: config::Store) -> Result<LoginResult> {
+    let spec = app.find_provider(provider)?.spec.clone();
+    let account = oauth::login(&app.home, &spec, &app.http, open_browser, store).await?;
+    app.providers.reload()?;
+    Ok(LoginResult { provider: spec.key, email: account.email })
+}
+
+/// Signs an OAuth provider out, keeping its registered client for reuse.
+pub fn logout(app: &App, provider: &str) -> Result<LogoutResult> {
+    let spec = app.find_provider(provider)?.spec.clone();
+    let signed_out = oauth::logout(&app.home, &spec)?;
+    app.providers.reload()?;
+    Ok(LogoutResult { provider: spec.key, signed_out })
 }
 
 /// Calls the provider's free `[auth_check]`, so a key can be tried without generating anything.
@@ -1349,7 +1428,7 @@ pub async fn check_spec(app: &App, p: CheckSpecParams) -> Result<SpecCheck> {
     let results = fixtures::run_all(&spec, &fixtures::for_key(&spec.key, Some(&app.home))).await;
     let requests = match &p.model {
         Some(model) => {
-            let provider = Provider::new(spec.clone(), Origin::Candidate, app.env(), app.http.clone());
+            let provider = Provider::new(spec.clone(), Origin::Candidate, app.env(), app.http.clone(), app.home.clone());
             let input = Value::Object(p.input.clone().unwrap_or_default());
             provider.dry_run(model, &input, &p.vars.clone().unwrap_or_default())?
         }

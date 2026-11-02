@@ -63,6 +63,7 @@ const PATTERNS: &[(ErrorKind, &[&str])] = &[
         "authentication",
         "permission denied",
         "uses credentials",
+        "not signed in",
     ]),
 ];
 
@@ -102,8 +103,8 @@ impl ErrorKind {
             Self::Moderation => "The provider refused the content: rewrite the prompt (or replace the input image) and generate \
                 again; the same input fails the same way.",
             Self::Auth => "The API key is missing or was refused: run `ai-media-router keys set NAME` in a terminal (the value is \
-                read from a hidden prompt, never from the conversation), or set it in the environment; list_providers shows \
-                what is set; it applies without a restart.",
+                read from a hidden prompt, never from the conversation), or set it in the environment; for account sign-in run \
+                `ai-media-router login PROVIDER` instead; list_providers shows what is set; it applies without a restart.",
             Self::Quota => "The account is out of credits or over its quota: top up with the provider, or switch to another \
                 provider (search_prices with configured_only).",
             Self::RateLimit => "Rate limited: wait a minute and generate again, or switch provider.",

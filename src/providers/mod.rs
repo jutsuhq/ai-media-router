@@ -2,6 +2,7 @@ mod auth;
 mod engine;
 pub mod exchange;
 pub mod fixtures;
+pub(crate) mod oauth;
 pub mod spec;
 mod template;
 
@@ -114,7 +115,7 @@ impl Registry {
         }
         let providers = specs
             .into_iter()
-            .map(|(key, (spec, origin))| (key, Arc::new(Provider::new(spec, origin, env.clone(), http.clone()))))
+            .map(|(key, (spec, origin))| (key, Arc::new(Provider::new(spec, origin, env.clone(), http.clone(), home.to_owned()))))
             .collect();
         Ok(Self { providers, env, problems })
     }

@@ -14,7 +14,7 @@ use super::{
     Origin,
     auth::Authenticator,
     exchange::{Doc, Exchange, Payload, Request, Response, Trace, Transport, replay},
-    spec::{Spec, Step, UploadKind},
+    spec::{AuthKind, Spec, Step, UploadKind},
     template::{Ctx, Mode, REPLAY_UUID, as_number, as_text, render_str, render_value},
 };
 use crate::config::Env;
@@ -58,23 +58,24 @@ pub struct Provider {
     route_auth: Vec<Option<Authenticator>>,
     env: Env,
     transport: Transport,
+    home: std::path::PathBuf,
 }
 
 impl Provider {
-    pub fn new(spec: Spec, origin: Origin, env: Env, http: reqwest::Client) -> Self {
-        Self::with_transport(spec, origin, env, Transport::Http(http))
+    pub fn new(spec: Spec, origin: Origin, env: Env, http: reqwest::Client, home: std::path::PathBuf) -> Self {
+        Self::with_transport(spec, origin, env, Transport::Http(http), home)
     }
 
     /// A provider that answers from recorded exchanges instead of the network.
     pub fn replaying(spec: Spec, env: Env, exchanges: Vec<Exchange>) -> Self {
-        Self::with_transport(spec, Origin::Candidate, env, Transport::Replay(VecDeque::from(exchanges).into()))
+        Self::with_transport(spec, Origin::Candidate, env, Transport::Replay(VecDeque::from(exchanges).into()), std::path::PathBuf::new())
     }
 
-    fn with_transport(spec: Spec, origin: Origin, env: Env, transport: Transport) -> Self {
+    fn with_transport(spec: Spec, origin: Origin, env: Env, transport: Transport, home: std::path::PathBuf) -> Self {
         let auth = Authenticator::new(spec.auth.clone(), env.clone());
         let route_auth =
             spec.routes.iter().map(|r| r.auth.clone().map(|a| Authenticator::new(a, env.clone()))).collect();
-        Self { spec, origin, auth, route_auth, env, transport }
+        Self { spec, origin, auth, route_auth, env, transport, home }
     }
 
     /// Env vars still to set. Empty when the top-level auth or any route's auth is complete.
@@ -285,7 +286,17 @@ impl Provider {
     /// Credential values of the top-level and route auths, at least 6 characters.
     pub fn secrets(&self) -> Vec<String> {
         let auths = std::iter::once(&self.spec.auth).chain(self.spec.routes.iter().filter_map(|r| r.auth.as_ref()));
-        auths.flat_map(|a| a.env.iter()).filter_map(|n| self.env.get(n)).filter(|v| v.len() >= 6).map(str::to_owned).collect()
+        let mut secrets = Vec::new();
+        for auth in auths {
+            for name in &auth.env {
+                if auth.kind == AuthKind::Oauth {
+                    secrets.extend(super::oauth::secrets(&self.home, name));
+                } else if let Some(v) = self.env.get(name).filter(|v| v.len() >= 6) {
+                    secrets.push(v.to_owned());
+                }
+            }
+        }
+        secrets
     }
 
     /// `text` with every credential value replaced, for errors that may quote a request or response.
@@ -838,7 +849,7 @@ outputs = ["/out"]
     async fn provider() -> Provider {
         let base = mock().await;
         let spec = Spec::parse(&SPEC.replace("BASE", &base)).unwrap();
-        Provider::new(spec, Origin::Candidate, Env::from_pairs([("MOCK_KEY", "k")]), reqwest::Client::new())
+        Provider::new(spec, Origin::Candidate, Env::from_pairs([("MOCK_KEY", "k")]), reqwest::Client::new(), std::path::PathBuf::new())
     }
 
     #[tokio::test]
@@ -873,7 +884,7 @@ outputs = ["/out"]
     #[test]
     fn dry_run_shows_requests_without_secrets() {
         let spec = Spec::parse(&SPEC.replace("BASE", "https://x.test")).unwrap();
-        let p = Provider::new(spec, Origin::Candidate, Env::default(), reqwest::Client::new());
+        let p = Provider::new(spec, Origin::Candidate, Env::default(), reqwest::Client::new(), std::path::PathBuf::new());
         assert_eq!(p.missing_env(), vec!["MOCK_KEY"]);
         let reqs = p.dry_run("video/x", &json!({ "prompt": "cat" }), &Map::new()).unwrap();
         assert_eq!(reqs[0].request.url, "https://x.test/submit");

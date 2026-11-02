@@ -45,6 +45,11 @@ impl Authenticator {
                     vec![self.auth.env.first().cloned().unwrap_or_else(|| self.auth.command[0].clone())]
                 }
             }
+            AuthKind::Oauth => match self.auth.env.first() {
+                Some(name) if self.env.get(name).is_some_and(super::oauth::holds_token) => Vec::new(),
+                Some(name) => vec![name.clone()],
+                None => Vec::new(),
+            },
             _ => self.auth.env.iter().filter(|v| self.env.get(v).is_none()).cloned().collect(),
         }
     }
@@ -59,7 +64,7 @@ impl Authenticator {
             return Ok(req);
         }
         Ok(match a.kind {
-            AuthKind::None | AuthKind::Query => req,
+            AuthKind::None | AuthKind::Query | AuthKind::Oauth => req,
             AuthKind::Bearer => req.bearer_auth(self.var(0)?),
             AuthKind::Header | AuthKind::Headers => {
                 let mut req = req;
@@ -93,6 +98,11 @@ impl Authenticator {
             AuthKind::Basic => vec![("authorization".to_owned(), format!("Basic base64({}:{})", name(0), name(1)))],
             AuthKind::JwtHs256 => bearer(format!("<JWT iss={} signed with {}>", name(0), name(1))),
             AuthKind::Command => bearer(format!("<output of `{}`>", a.command.join(" "))),
+            AuthKind::Oauth => {
+                let env = a.env.first().map(String::as_str).unwrap_or("?");
+                let account = self.env.get(env).and_then(super::oauth::email).unwrap_or_else(|| env.to_owned());
+                vec![("authorization".to_owned(), format!("Bearer <{account}>"))]
+            }
         };
         let query = (a.kind == AuthKind::Query).then(|| (self.query_param().to_owned(), name(0)));
         AuthPlaceholders { headers, query }

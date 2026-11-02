@@ -89,6 +89,30 @@ pub fn raw_env(home: &Path) -> HashMap<String, String> {
         .collect()
 }
 
+/// One `[env]` value by name, without loading the whole env: the process environment first
+/// (non-empty), then a `keychain:` marker resolved, then the plain `[env]` value.
+pub fn get_one(home: &Path, name: &str) -> Option<String> {
+    if let Ok(value) = std::env::var(name)
+        && !value.is_empty()
+    {
+        return Some(value);
+    }
+    let value = raw_env(home).remove(name)?;
+    match value.strip_prefix(KEYCHAIN_PREFIX) {
+        Some(service) => keychain_get(service, name),
+        None => Some(value),
+    }
+}
+
+/// Where `name` is kept now, so a rewrite (a refreshed session) stays there; `Auto` when unset.
+pub fn current_store(home: &Path, name: &str) -> Store {
+    match raw_env(home).get(name) {
+        Some(v) if v.starts_with(KEYCHAIN_PREFIX) => Store::Keychain,
+        Some(_) => Store::File,
+        None => Store::Auto,
+    }
+}
+
 /// True when `path` is group- or world-accessible; always false off unix.
 pub fn loose_permissions(path: &Path) -> bool {
     #[cfg(unix)]
@@ -171,6 +195,19 @@ fn keychain_get(service: &str, account: &str) -> Option<String> {
     Some(text)
 }
 
+/// The `security -i` line that stores `value` under `service`/`account`. `security -i` truncates
+/// long input lines, so a value whose hex form exceeds 4000 bytes is refused rather than corrupted.
+fn macos_keychain_line(service: &str, account: &str, value: &str) -> Result<String> {
+    let line = format!("add-generic-password -U -s {service} -a {account} -X {}\n", hex::encode(value.as_bytes()));
+    if line.len() > 4000 {
+        bail!(
+            "{account} is too long for the macOS keychain (values over ~2000 bytes are truncated); \
+             run again with --store file to keep it in config.toml (mode 0600)"
+        );
+    }
+    Ok(line)
+}
+
 /// The value travels over stdin (or as hex), never in argv.
 fn keychain_store(service: &str, account: &str, value: &str) -> Result<()> {
     let name = keychain_name().ok_or_else(|| {
@@ -179,7 +216,7 @@ fn keychain_store(service: &str, account: &str, value: &str) -> Result<()> {
         )
     })?;
     let (program, args, stdin_text): (&str, Vec<String>, String) = if cfg!(target_os = "macos") {
-        let line = format!("add-generic-password -U -s {service} -a {account} -X {}\n", hex::encode(value.as_bytes()));
+        let line = macos_keychain_line(service, account, value)?;
         ("/usr/bin/security", vec!["-i".to_owned()], line)
     } else {
         (
@@ -504,5 +541,12 @@ mod tests {
     fn mask_hides_long_and_short() {
         assert_eq!(mask("sk-1234567890abcd"), "…abcd");
         assert_eq!(mask("short"), "…");
+    }
+
+    #[test]
+    fn macos_keychain_line_refuses_long_values() {
+        assert!(macos_keychain_line("svc", "KEY", &"a".repeat(1900)).is_ok());
+        let err = macos_keychain_line("svc", "KEY", &"a".repeat(2500)).unwrap_err().to_string();
+        assert!(err.contains("--store file"), "{err}");
     }
 }

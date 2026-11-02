@@ -61,6 +61,7 @@ pub enum AuthKind {
     Basic,
     JwtHs256,
     Command,
+    Oauth,
     None,
 }
 
@@ -84,6 +85,10 @@ pub struct Auth {
     /// Credentials are sent only when every `env` var is set, and never gate "configured".
     #[serde(default)]
     pub optional: bool,
+    /// For `oauth`: the protected resource URL; defaults to `base_url`.
+    pub resource: Option<String>,
+    /// For `oauth`: space-separated scopes; default `openid email offline_access`.
+    pub scope: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -280,10 +285,10 @@ impl Spec {
             "base_url must be an http(s) URL or start with a template such as {{{{env.SERVER_URL}}}}"
         );
 
-        validate_auth(&self.auth, "[auth]")?;
+        validate_auth(&self.auth, "[auth]", &self.base_url)?;
         for (i, r) in self.routes.iter().enumerate() {
             if let Some(a) = &r.auth {
-                validate_auth(a, &format!("route {i} auth"))?;
+                validate_auth(a, &format!("route {i} auth"), &self.base_url)?;
             }
         }
 
@@ -455,7 +460,7 @@ fn check_vars(table: &str, templates: &[&str], ok: impl Fn(&str) -> bool, why: &
     }
     Ok(())
 }
-fn validate_auth(a: &Auth, label: &str) -> Result<()> {
+fn validate_auth(a: &Auth, label: &str, base_url: &str) -> Result<()> {
     let need_env = match a.kind {
         AuthKind::None | AuthKind::Command => 0,
         AuthKind::Basic | AuthKind::JwtHs256 => 2,
@@ -467,9 +472,27 @@ fn validate_auth(a: &Auth, label: &str) -> Result<()> {
         AuthKind::Query => ensure!(a.param.is_some(), "{label}: auth query needs `param`"),
         AuthKind::Headers => ensure!(a.names.len() == a.env.len(), "{label}: auth headers needs one name per env var"),
         AuthKind::Command => ensure!(!a.command.is_empty(), "{label}: auth command needs `command`"),
+        AuthKind::Oauth => {
+            ensure!(a.env.len() == 1, "{label}: auth oauth needs exactly one env var (the session slot)");
+            let resource = a.resource.as_deref().unwrap_or(base_url);
+            ensure!(
+                is_https_or_loopback_http(resource),
+                "{label}: auth oauth `resource` `{resource}` must be https or a loopback http://127.0.0.1/localhost URL"
+            );
+        }
         _ => {}
     }
     Ok(())
+}
+
+/// `resource` must be https, or loopback http (only for a local emulator).
+fn is_https_or_loopback_http(url: &str) -> bool {
+    let Ok(url) = reqwest::Url::parse(url) else { return false };
+    match url.scheme() {
+        "https" => true,
+        "http" => matches!(url.host_str(), Some("127.0.0.1") | Some("localhost") | Some("::1")),
+        _ => false,
+    }
 }
 
 /// A pointer field written as one string or a list of them.
@@ -597,5 +620,14 @@ quota = []
 ok = [0]
 ").unwrap_err());
         assert!(err.contains("needs `code`"), "{err}");
+    }
+
+    #[test]
+    fn oauth_spec_parses_and_checks_resource() {
+        let oauth = MINIMAL.replace("type = \"none\"", "type = \"oauth\"\nenv = [\"X_SESSION\"]");
+        Spec::parse(&oauth).unwrap();
+        let err = Spec::parse(&oauth.replace("https://x.test", "http://example.com")).unwrap_err().to_string();
+        assert!(err.contains("oauth") && err.contains("resource"), "{err}");
+        Spec::parse(&oauth.replace("https://x.test", "http://127.0.0.1:9")).unwrap();
     }
 }

@@ -116,6 +116,7 @@ A pointer of `""` means the whole body.
 | `basic` | `env = ["USER", "PASS"]` | HTTP basic auth |
 | `jwt_hs256` | `env = ["ACCESS", "SECRET"]`, optional `ttl_secs` (default 1800) | `Authorization: Bearer <JWT{iss: ACCESS, exp, nbf}>` signed with SECRET |
 | `command` | `command = ["gcloud", "auth", "print-access-token"]`, optional `env` (token override) | `Authorization: Bearer <stdout>`, cached 30 min |
+| `oauth` | `env = ["SESSION_SLOT"]`, optional `resource` (default `base_url`), optional `scope` (default `"openid email offline_access"`) | `Authorization: Bearer <access token>` on MCP tool steps, after `ai-media-router login <key>` |
 | `none` | optional `env` | nothing; use with `[headers]` templates like `Authorization = "Key {{env.ID}}:{{env.SECRET}}"`. Listed `env` vars still gate "configured" |
 
 `optional = true` (any type) sends the credentials only when every `env` variable is
@@ -125,6 +126,18 @@ may or may not sit behind an authenticating proxy.
 A provider counts as configured when every `env` variable of `[auth]` is set
 (for `command`: the command exists or the env override is set), or when every
 variable of some route's `auth` is set.
+
+`oauth` signs in to an account instead of reading a key. `ai-media-router login <key>` discovers
+the authorization server from the resource's metadata (RFC 9728, then RFC 8414), registers a client
+once (RFC 7591), runs the authorization-code flow with PKCE S256 through a loopback callback
+(127.0.0.1 port 41687, 53419 or 60871), and checks `state` and the issuer (RFC 9207). Every
+discovered endpoint must be https; plain http is accepted only when `resource` is itself a loopback
+http URL (a local test server). The session is kept under the `env` name like a key (OS keychain, or
+config.toml with mode 0600): the refresh token, client id and account email, never the access token
+when a refresh token exists. Access tokens are refreshed before they expire and once more after a 401;
+when the refresh is refused the provider reports `not signed in` until `login` runs again.
+`logout <key>` drops the tokens and keeps the client id. MCP and REST only report the state
+(`get_provider` / `list_keys`: `signed_in`, `account`, `login_command`); no tool takes a token.
 
 ## `[headers]`
 

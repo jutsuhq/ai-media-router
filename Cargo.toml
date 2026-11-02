@@ -13,6 +13,7 @@ categories = ["command-line-utilities", "multimedia"]
 
 [dependencies]
 anyhow = "1.0.104"
+async-trait = "0.1"
 axum = "0.8.9"
 base64 = "0.23.1"
 clap = { version = "4.6.7", features = ["derive", "env"] }
@@ -21,7 +22,7 @@ futures-util = "0.3.34"
 hex = "0.4.3"
 hmac = "0.13.0"
 reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls", "stream", "http2", "multipart", "form"] }
-rmcp = { version = "3.8", features = ["server", "macros", "transport-io", "schemars", "transport-streamable-http-server"] }
+rmcp = { version = "3.8", features = ["server", "macros", "transport-io", "schemars", "transport-streamable-http-server", "auth", "client", "transport-streamable-http-client-reqwest"] }
 rusqlite = { version = "0.41.1", features = ["bundled"] }
 schemars = "1"
 serde = { version = "1.0.229", features = ["derive"] }

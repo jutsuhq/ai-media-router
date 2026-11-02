@@ -256,6 +256,17 @@ enum Command {
     /// Set, remove, list or test provider API keys; `set` and `remove` are CLI-only so a key never travels through MCP or REST.
     #[command(subcommand)]
     Keys(KeysCommand),
+    /// Sign in to an account-based provider (`[auth] type = "oauth"`) in the browser; CLI-only.
+    Login {
+        provider: String,
+        /// Print the sign-in URL instead of opening a browser.
+        #[arg(long)]
+        no_browser: bool,
+        #[arg(long, value_enum)]
+        store: Option<StoreArg>,
+    },
+    /// Sign out of an account-based provider; the registered client is kept for the next sign-in.
+    Logout { provider: String },
     /// List the MCP prompts (workflows and recipes), or print one with --arg name=value.
     Prompts {
         name: Option<String>,
@@ -804,6 +815,10 @@ pub async fn run() -> Result<()> {
             }
             print(&serde_json::json!({ "stored": stored, "status": status }))?;
         }
+        Command::Login { provider, no_browser, store } => {
+            print(&login(&app, &provider, !no_browser, store.unwrap_or(StoreArg::Auto).into()).await?)?
+        }
+        Command::Logout { provider } => print(&logout(&app, &provider)?)?,
         Command::Keys(KeysCommand::List) => print(&list_keys(&app)?)?,
         Command::Keys(KeysCommand::Test { provider }) => print(&test_key(&app, ProviderParams { provider }).await?)?,
         Command::Keys(KeysCommand::Remove { name }) => print(&crate::config::remove_key(&app.home, &name)?)?,
