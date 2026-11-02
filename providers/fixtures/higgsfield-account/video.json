@@ -1,0 +1,143 @@
+{
+  "source": "Answer shapes from the Jutsu Studio app's live MCP tool snapshot (2026-10-28); ids and URLs made up.",
+  "model": "seedance_2_5",
+  "input": {
+    "prompt": "a paper boat drifting on a calm lake",
+    "duration": 4,
+    "aspect_ratio": "9:16"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://mcp.higgsfield.ai/mcp",
+        "body": {
+          "jsonrpc": "2.0",
+          "method": "tools/call",
+          "params": {
+            "name": "generate_video",
+            "arguments": {
+              "params": {
+                "model": "seedance_2_5",
+                "use_unlim": false,
+                "prompt": "a paper boat drifting on a calm lake",
+                "duration": 4,
+                "aspect_ratio": "9:16"
+              }
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"results\": [{\"id\": \"3f6c2a1e-8d4b-4c2f-9a7e-5b1d0c9e4f21\", \"type\": \"video\", \"status\": \"pending\", \"model\": \"seedance_2_5\"}]}"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "results": [
+                {
+                  "id": "3f6c2a1e-8d4b-4c2f-9a7e-5b1d0c9e4f21",
+                  "type": "video",
+                  "status": "pending",
+                  "model": "seedance_2_5"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "POST",
+        "url": "https://mcp.higgsfield.ai/mcp",
+        "body": {
+          "jsonrpc": "2.0",
+          "method": "tools/call",
+          "params": {
+            "name": "job_status",
+            "arguments": {
+              "jobId": "3f6c2a1e-8d4b-4c2f-9a7e-5b1d0c9e4f21"
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"generation\": {\"id\": \"3f6c2a1e-8d4b-4c2f-9a7e-5b1d0c9e4f21\", \"status\": \"in_progress\"}}"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "generation": {
+                "id": "3f6c2a1e-8d4b-4c2f-9a7e-5b1d0c9e4f21",
+                "status": "in_progress"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "POST",
+        "url": "https://mcp.higgsfield.ai/mcp",
+        "body": {
+          "jsonrpc": "2.0",
+          "method": "tools/call",
+          "params": {
+            "name": "job_status",
+            "arguments": {
+              "jobId": "3f6c2a1e-8d4b-4c2f-9a7e-5b1d0c9e4f21"
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"generation\": {\"id\": \"3f6c2a1e-8d4b-4c2f-9a7e-5b1d0c9e4f21\", \"status\": \"completed\", \"results\": {\"rawUrl\": \"https://cdn.higgsfield.test/jobs/3f6c2a1e-8d4b-4c2f-9a7e-5b1d0c9e4f21/video.mp4\"}}}"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "generation": {
+                "id": "3f6c2a1e-8d4b-4c2f-9a7e-5b1d0c9e4f21",
+                "status": "completed",
+                "results": {
+                  "rawUrl": "https://cdn.higgsfield.test/jobs/3f6c2a1e-8d4b-4c2f-9a7e-5b1d0c9e4f21/video.mp4"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://cdn.higgsfield.test/jobs/3f6c2a1e-8d4b-4c2f-9a7e-5b1d0c9e4f21/video.mp4"
+    ]
+  }
+}

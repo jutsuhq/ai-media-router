@@ -1,0 +1,52 @@
+{
+  "source": "Answer shapes from the Jutsu Studio app's live MCP tool snapshot (2026-10-28); ids and URLs made up.",
+  "model": "seedance_2_5",
+  "input": {
+    "prompt": "a paper boat drifting on a calm lake",
+    "duration": 4,
+    "aspect_ratio": "9:16"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://mcp.higgsfield.ai/mcp",
+        "body": {
+          "jsonrpc": "2.0",
+          "method": "tools/call",
+          "params": {
+            "name": "generate_video",
+            "arguments": {
+              "params": {
+                "model": "seedance_2_5",
+                "use_unlim": false,
+                "prompt": "a paper boat drifting on a calm lake",
+                "duration": 4,
+                "aspect_ratio": "9:16"
+              }
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "Invalid request: model is required"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "error": "Invalid request: model is required"
+  }
+}

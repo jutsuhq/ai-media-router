@@ -190,7 +190,6 @@ fn oauth_name(spec: &Spec) -> Result<&str> {
     spec.auth.env.first().map(String::as_str).ok_or_else(|| anyhow!("`{}` oauth auth needs an env slot", spec.key))
 }
 
-#[allow(dead_code)] // used by MCP tool steps, which land next
 fn auth_name(auth: &Auth) -> Result<&str> {
     auth.env.first().map(String::as_str).ok_or_else(|| anyhow!("oauth auth needs an env slot"))
 }
@@ -292,7 +291,6 @@ async fn resolve(home: &Path, name: &str, resource: &str, store: Store) -> Resul
 }
 
 /// A manager for part 2 (MCP transport), already signed in.
-#[allow(dead_code)] // used by MCP tool steps, which land next
 pub(crate) async fn manager(home: &Path, key: &str, auth: &Auth, base_url: &str) -> Result<AuthorizationManager> {
     let name = auth_name(auth)?;
     let resource = auth.resource.as_deref().unwrap_or(base_url);

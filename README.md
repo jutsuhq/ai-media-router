@@ -62,11 +62,11 @@ Principles: bring your own keys (no middleman account), the agent chooses provid
 
 ## Supported providers
 
-43 built-in provider specs, each a TOML file in [`providers/`](providers) with recorded fixtures. `ai-media-router providers` lists them with the env vars each one still needs.
+44 built-in provider specs (Higgsfield has two), each a TOML file in [`providers/`](providers) with recorded fixtures. `ai-media-router providers` lists them with the env vars each one still needs.
 
 | Kind | Providers (key) |
 |---|---|
-| Inference platforms and API aggregators | fal.ai (`fal`), Replicate (`replicate`), Runware (`runware`), WaveSpeedAI (`wavespeed`), kie.ai (`kie`), OpenRouter (`openrouter`), Vercel AI Gateway (`vercel`), Together AI (`together`), DeepInfra (`deepinfra`), Novita AI (`novita`), SiliconFlow (`siliconflow`), Segmind (`segmind`), Atlas Cloud (`atlascloud`), each::labs (`eachlabs`), AI/ML API (`aimlapi`), 302.AI (`ai302`), APIMart (`apimart`), CometAPI (`cometapi`), EvoLink (`evolink`), PiAPI (`piapi`), ModelsLab (`modelslab`), Makernice (`makernice`), Pollo AI (`pollo`), Sume (`sume`), Unifically (`unifically`), Yir (`yir`), Higgsfield (`higgsfield`), Comfy Router partner models (`comfy`) |
+| Inference platforms and API aggregators | fal.ai (`fal`), Replicate (`replicate`), Runware (`runware`), WaveSpeedAI (`wavespeed`), kie.ai (`kie`), OpenRouter (`openrouter`), Vercel AI Gateway (`vercel`), Together AI (`together`), DeepInfra (`deepinfra`), Novita AI (`novita`), SiliconFlow (`siliconflow`), Segmind (`segmind`), Atlas Cloud (`atlascloud`), each::labs (`eachlabs`), AI/ML API (`aimlapi`), 302.AI (`ai302`), APIMart (`apimart`), CometAPI (`cometapi`), EvoLink (`evolink`), PiAPI (`piapi`), ModelsLab (`modelslab`), Makernice (`makernice`), Pollo AI (`pollo`), Sume (`sume`), Unifically (`unifically`), Yir (`yir`), Higgsfield (`higgsfield`; `higgsfield-account` signs in to the account and pays in credits), Comfy Router partner models (`comfy`) |
 | Model makers' own APIs | BytePlus ModelArk (`byteplus`) and Volcengine Ark (`volcengine`) for Seedance and Seedream, Kling (`kling`), Gemini API (`gemini`) for Veo and Nano Banana, Google Vertex AI (`vertex`) for Veo, Imagen and Nano Banana, Alibaba Cloud Model Studio (`alibaba`, `alibaba-cn`) for Wan, MiniMax Hailuo (`minimax`), Runway (`runway`), Luma (`luma`), LTX (`ltx`), PixVerse (`pixverse`), Vidu (`vidu`), xAI Grok Imagine (`xai`) |
 | Self-hosted | ComfyUI (`comfyui`): your own server or a rented GPU, any workflow in API format, 0 USD per job |
 
@@ -118,6 +118,19 @@ environment still overrides both, and keys apply without a restart.
 (environment, keychain or config file), its last four characters and the exact `keys set` command.
 `ai-media-router keys test kie` makes a free auth check where its spec defines `auth_check`: accepted, refused,
 inconclusive, not_supported or not_configured. `ai-media-router keys remove FAL_KEY` deletes a key.
+
+**Or sign in to an account.** `higgsfield-account` uses your Higgsfield account and its credits instead of
+an API key (the `higgsfield` provider is the API key pair, billed in USD):
+
+```bash
+ai-media-router login higgsfield-account
+```
+
+A browser opens to sign in (`--no-browser` prints the URL instead); the command listens on 127.0.0.1 only
+until the sign-in finishes or five minutes pass. The session is stored like a key, in the keychain or
+`config.toml`, and refreshes itself; `ai-media-router logout higgsfield-account` signs out. Agents see
+only whether you are signed in, never a token. Budgets count USD: a job paid in credits counts its
+`estimated_cost_usd`, as kie's credit-billed jobs do.
 
 `<home>` is set by `--home` or `AI_MEDIA_ROUTER_HOME`. By default it is the OS data dir: `~/Library/Application Support/jutsu.ai-media-router` on macOS, `%APPDATA%\jutsu\ai-media-router\data` on Windows, `~/.local/share/ai-media-router` on Linux. `ai-media-router providers` lists every provider and the env vars it still needs.
 
@@ -425,7 +438,7 @@ Every failed job carries `error_kind`, `retryable` and a `hint` with what to do 
 | `error_kind` | Retryable | What the agent should do |
 |---|---|---|
 | `moderation` | no | Rewrite the prompt or replace the input image |
-| `auth` | no | Set the key with `ai-media-router keys set <NAME>` in a terminal (`get_provider` shows what is missing) |
+| `auth` | no | Set the key with `ai-media-router keys set <NAME>` in a terminal, or sign in again with `ai-media-router login <provider>` for an account provider (`get_provider` shows what is missing) |
 | `quota` | no | Top up with the provider, or switch provider |
 | `invalid_input` | no | Compare with `get_provider`'s example and docs |
 | `not_found` | no | Check the model id against `model_hint` |

@@ -1,6 +1,6 @@
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use directories::ProjectDirs;
 use tokio::sync::OnceCell;
 
@@ -73,6 +73,12 @@ impl App {
     pub fn provider(&self, key: &str) -> Result<Arc<Provider>> {
         let provider = self.find_provider(key)?;
         let missing = provider.missing_env();
+        if !missing.is_empty() && provider.spec.auth.kind == crate::providers::spec::AuthKind::Oauth {
+            bail!(
+                "provider `{key}` is not signed in: run `ai-media-router login {key}` in a terminal (a browser opens to \
+                 sign in to the account); picked up without restart"
+            );
+        }
         if !missing.is_empty() {
             return Err(anyhow!(
                 "provider `{key}` is not configured: run `ai-media-router keys set {}` in a terminal (the value is \

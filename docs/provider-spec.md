@@ -204,6 +204,8 @@ Common fields:
 | `capture` | Table `var = "pointer"`; captured values become template variables for later steps. |
 | `outputs` | Array of pointers to result media (see below). |
 | `cost` | Pointer to the cost reported by the provider (any unit). Read from submit, poll and result; the latest step that has it wins. |
+| `tool` | Instead of `url`: the name of a tool on the MCP server at `base_url`, called as the signed-in account (needs `[auth] type = "oauth"`). |
+| `arguments` | The tool's arguments, templated like `body` (`"{{input}}"`, `"$merge"`). A tool step has no `method`, `headers`, `body`, `form`, `multipart` or `binary`. |
 
 `[prepare]` (optional, default `POST`) runs once before submit with the same
 `input`; its captures are available to submit, e.g. a price quote that the
@@ -222,6 +224,16 @@ outputs, polling is skipped.
 | `failure` | Status values meaning failed. Everything else = still running. |
 | `error` | Pointer (or list of pointers, joined with `; `) to the failure message. With `failure` values listed it only explains a failure; with `failure = []` (fal, Comfy: failed tasks end as COMPLETED) a non-empty `error` on a success status fails the job. |
 | `outputs` | Pointers to media, read when status is success (unless `[result]` exists). |
+
+A tool step is recorded as `POST <base_url>` with the JSON-RPC body
+`{"jsonrpc": "2.0", "method": "tools/call", "params": {"name", "arguments"}}`, so dry runs,
+traces and fixtures look like any other step; a fixture's response is the JSON-RPC answer. The
+step's pointers then read the tool result's `structuredContent`, else the JSON in its first text
+block, else that text as a string. A JSON-RPC error or `isError: true` fails the step with the
+server's message. When the session is signed in, `check_spec` also lists the server's tools and
+reports in `tool_problems` every tool step whose tool is missing, or whose `arguments` leave out
+a `required` name or send one the tool's `inputSchema` does not declare (top-level names only).
+`[auth_check]` may be a tool step that calls a free tool, e.g. `tool = "balance"`.
 
 `[result]` (optional) runs once after poll success, for APIs that need a
 separate call to fetch the output (fal `response_url`, MiniMax file retrieve,
@@ -257,12 +269,12 @@ How a local library file becomes something the provider accepts as a reference.
 | `multipart` | `url`, optional `method` (default POST), `file_field` (default `file`), `fields` (templated, `{{file_name}}` available), `result` pointer to the hosted URL or id |
 | `json` | `url`, `body` (templated; `{{base64}}`, `{{data_uri}}`, `{{file_name}}`, `{{mime}}`, `{{size_bytes}}` available), `result` pointer |
 | `data_uri` | nothing – the provider accepts `data:` URIs directly in input |
-| `put` | presigned PUT: `url` + `body` request returns `capture` (`upload_url`, `file_url`), then the bytes are `PUT` to `{{upload_url}}` without credentials; returns `file_url`. `put_headers` = pointer to an object of headers the presign response requires on the PUT |
+| `put` | presigned PUT: `url` + `body` request (or `tool` + `arguments`) returns `capture` (`upload_url`, `file_url`), then the bytes are `PUT` to `{{upload_url}}` without credentials; returns `file_url`. `put_headers` = pointer to an object of headers the presign response requires on the PUT |
 | `post_form` | presigned POST form (S3 style): like `put`, but the file is POSTed as multipart to `upload_url` together with the fields at the `form_fields` pointer; `file_field` defaults to `file` |
 
 `complete` (`put` / `post_form`, optional) is a step run after the file transfer
-(e.g. `POST /v1/files/{{file_id}}/complete`); its templates see the upload
-variables and captures. With `complete`, `result` is a pointer into its response
+(e.g. `POST /v1/files/{{file_id}}/complete`, or a tool step); its templates see the upload
+variables (`{{media_type}}` is the MIME type's first part, e.g. `image`) and captures. With `complete`, `result` is a pointer into its response
 and `file_url` need not be captured.
 
 `usage` (any type) tells agents where the returned reference goes when it is not

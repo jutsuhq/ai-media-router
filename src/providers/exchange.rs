@@ -41,6 +41,8 @@ pub enum Payload {
     /// Text fields come from `body`; the file goes into `file_field`.
     Multipart { file_field: String, file_name: String, mime: String, bytes: Vec<u8> },
     Bytes(Vec<u8>),
+    /// A JSON-RPC `tools/call` in `body`, sent through the MCP client as the signed-in account.
+    Tool,
 }
 
 /// What auth adds to a request, with every secret shown as `<ENV_NAME>`.

@@ -111,7 +111,12 @@ pub struct Errors {
 #[serde(deny_unknown_fields)]
 pub struct Step {
     pub method: Option<String>,
+    #[serde(default)]
     pub url: String,
+    /// Calls this tool on the MCP server at `base_url` instead of sending an HTTP request.
+    pub tool: Option<String>,
+    /// The tool's arguments, a template like `body`.
+    pub arguments: Option<Value>,
     #[serde(default)]
     pub headers: BTreeMap<String, String>,
     pub body: Option<Value>,
@@ -176,6 +181,9 @@ pub struct Upload {
     pub kind: UploadKind,
     pub method: Option<String>,
     pub url: Option<String>,
+    /// `put`: the MCP tool that returns the presigned URL, instead of `url`.
+    pub tool: Option<String>,
+    pub arguments: Option<Value>,
     pub file_field: Option<String>,
     #[serde(default)]
     pub fields: BTreeMap<String, String>,
@@ -241,7 +249,8 @@ fn named<'a>(
 
 /// Variables every generation step may use besides captures and `env.*`.
 const JOB_VARS: &[&str] = &["model", "uuid", "request_uuid", "input"];
-const UPLOAD_VARS: &[&str] = &["uuid", "request_uuid", "file_name", "mime", "base64", "data_uri", "size_bytes"];
+const UPLOAD_VARS: &[&str] =
+    &["uuid", "request_uuid", "file_name", "mime", "media_type", "base64", "data_uri", "size_bytes"];
 
 impl Spec {
     pub fn parse(text: &str) -> Result<Self> {
@@ -335,19 +344,20 @@ impl Spec {
             match u.kind {
                 UploadKind::DataUri => {}
                 UploadKind::Put | UploadKind::PostForm => ensure!(
-                    u.url.is_some()
+                    (u.url.is_some() || (u.tool.is_some() && u.kind == UploadKind::Put))
                         && u.capture.contains_key("upload_url")
                         && (u.capture.contains_key("file_url") || (u.complete.is_some() && u.result.is_some())),
                     "upload {} needs url, capture upload_url, and capture file_url or complete + result",
                     u.kind.as_str()
                 ),
                 _ => ensure!(
-                    u.url.is_some() && u.result.is_some(),
+                    u.url.is_some() && u.tool.is_none() && u.result.is_some(),
                     "upload {} needs url and result",
                     u.kind.as_str()
                 ),
             }
         }
+        self.validate_tools()?;
         if let Some(e) = &self.errors {
             ensure!(e.code.is_some() || e.ok.is_empty(), "[errors]: `ok` needs `code`");
             ensure!(
@@ -364,6 +374,55 @@ impl Spec {
         }
         self.lint_pointers()?;
         self.lint_templates()
+    }
+
+    /// Every step is either an HTTP request (`url`) or an MCP tool call (`tool`), and tool calls
+    /// need the signed-in account: `[auth] type = "oauth"`.
+    fn validate_tools(&self) -> Result<()> {
+        let upload = self.upload.as_ref();
+        for (name, step) in self.every_step() {
+            match &step.tool {
+                Some(tool) => {
+                    ensure!(!tool.is_empty() && step.url.is_empty(), "[{name}]: set either `url` or `tool`, not both");
+                    ensure!(
+                        step.method.is_none() && step.body.is_none() && !step.form && !step.multipart && step.headers.is_empty() && !step.binary,
+                        "[{name}]: a tool step sends `arguments` only: remove method, body, form, multipart, headers and binary"
+                    );
+                }
+                None => {
+                    ensure!(!step.url.is_empty(), "[{name}]: needs `url` (an HTTP request) or `tool` (an MCP tool call)");
+                    ensure!(step.arguments.is_none(), "[{name}]: `arguments` is for tool steps; use `body` with `url`");
+                }
+            }
+        }
+        if let Some(u) = upload {
+            ensure!(u.tool.is_none() || u.url.is_none(), "[upload]: set either `url` or `tool`, not both");
+            ensure!(
+                u.tool.is_none() || (u.method.is_none() && u.body.is_none() && u.fields.is_empty()),
+                "[upload]: a tool upload sends `arguments` only: remove method, body and fields"
+            );
+            ensure!(u.arguments.is_none() || u.tool.is_some(), "[upload]: `arguments` is for `tool`; use `body` with `url`");
+        }
+        ensure!(
+            self.tool_steps().is_empty() || (self.auth.kind == AuthKind::Oauth && self.routes.iter().all(|r| r.auth.is_none())),
+            "tool steps call the MCP server as the signed-in account: set [auth] type = \"oauth\" and no route auth"
+        );
+        Ok(())
+    }
+
+    /// The MCP tool steps, with their table names (`poll`, `route.0.submit`, `upload`, …).
+    pub fn tool_steps(&self) -> Vec<(String, &str, Option<&Value>)> {
+        let upload = self.upload.as_ref();
+        let mut out: Vec<(String, &str, Option<&Value>)> = self
+            .every_step()
+            .filter_map(|(name, s)| Some((name, s.tool.as_deref()?, s.arguments.as_ref())))
+            .collect();
+        if let Some(u) = upload
+            && let Some(tool) = &u.tool
+        {
+            out.push(("upload".to_owned(), tool, u.arguments.as_ref()));
+        }
+        out
     }
 
     pub fn error_kinds(&self) -> Option<&Patterns> {
@@ -409,21 +468,28 @@ impl Spec {
             self.all_steps().flat_map(|(_, s)| s.capture.keys().map(String::as_str)).collect();
         let env = |v: &str| v.starts_with("env.");
         for (name, step) in self.all_steps() {
-            let found = templates([&step.url], step.headers.values().chain(self.headers.values()), &step.body);
+            let found = templates([&step.url], step.headers.values().chain(self.headers.values()), [&step.body, &step.arguments]);
             let ok = |v: &str| JOB_VARS.contains(&v) || captured.contains(v) || env(v);
             check_vars(&format!("[{name}]"), &found, ok, "is never captured or provided")?;
         }
         if let Some(u) = &self.upload {
-            let found = templates(&u.url, u.fields.values().chain(self.headers.values()), &u.body);
+            let found = templates(&u.url, u.fields.values().chain(self.headers.values()), [&u.body, &u.arguments]);
             let why = format!("is not available in uploads (have {})", UPLOAD_VARS.join(", "));
             check_vars("[upload]", &found, |v| UPLOAD_VARS.contains(&v) || env(v), &why)?;
             if let Some(c) = &u.complete {
-                let found = templates([&c.url], c.headers.values(), &c.body);
+                let found = templates([&c.url], c.headers.values(), [&c.body, &c.arguments]);
                 let ok = |v: &str| UPLOAD_VARS.contains(&v) || u.capture.contains_key(v) || env(v);
                 check_vars("[upload.complete]", &found, ok, "is neither an upload variable nor captured")?;
             }
         }
         Ok(())
+    }
+
+    /// `all_steps` plus `[auth_check]` and `[upload.complete]`.
+    fn every_step(&self) -> impl Iterator<Item = (String, &Step)> {
+        let complete = self.upload.as_ref().and_then(|u| u.complete.as_ref());
+        let extra = [("auth_check", self.auth_check.as_ref()), ("upload.complete", complete)];
+        self.all_steps().chain(extra.into_iter().filter_map(|(n, s)| Some((n.to_owned(), s?))))
     }
 
     fn all_steps(&self) -> impl Iterator<Item = (String, &Step)> {
@@ -437,14 +503,15 @@ impl Spec {
     }
 }
 
-/// Every template string of a step-like table: url, header values, then strings in the body.
+/// Every template string of a step-like table: url, header values, then strings in the body
+/// and the tool arguments.
 fn templates<'a>(
     url: impl IntoIterator<Item = &'a String>,
     headers: impl Iterator<Item = &'a String>,
-    body: &'a Option<Value>,
+    bodies: [&'a Option<Value>; 2],
 ) -> Vec<&'a str> {
     let mut out: Vec<&str> = url.into_iter().chain(headers).map(String::as_str).collect();
-    if let Some(body) = body {
+    for body in bodies.into_iter().flatten() {
         strings(body, &mut out);
     }
     out
@@ -559,6 +626,26 @@ mod tests {
         assert!(glob_match("exact", "exact"));
         assert!(!glob_match("exact", "exactly"));
         assert!(!glob_match("kling/*", "veo/3"));
+    }
+
+    #[test]
+    fn tool_steps_need_oauth_and_send_only_arguments() {
+        let head = "key = \"x\"\nname = \"X\"\ncatalog = []\ndocs = \"-\"\nmodel_hint = \"-\"\nbase_url = \"https://x.test/mcp\"\n";
+        let oauth = "[auth]\ntype = \"oauth\"\nenv = [\"X_SESSION\"]\n";
+        let submit = "[submit]\ntool = \"gen\"\narguments = { prompt = \"{{input}}\" }\noutputs = [\"/url\"]\n";
+        let parse = |text: String| Spec::parse(&text).map_err(|e| format!("{e:#}"));
+        let spec = parse(format!("{head}{oauth}{submit}")).unwrap();
+        assert_eq!(spec.tool_steps().iter().map(|(t, n, _)| (t.as_str(), *n)).collect::<Vec<_>>(), [("submit", "gen")]);
+        let err = parse(format!("{head}[auth]\ntype = \"none\"\n{submit}")).unwrap_err();
+        assert!(err.contains("type = \"oauth\""), "{err}");
+        let err = parse(format!("{head}{oauth}{submit}body = {{ a = 1 }}\n")).unwrap_err();
+        assert!(err.contains("[submit]: a tool step sends `arguments` only"), "{err}");
+        let err = parse(format!("{head}{oauth}{submit}url = \"/s\"\n")).unwrap_err();
+        assert!(err.contains("either `url` or `tool`"), "{err}");
+        let err = parse(format!("{head}{oauth}[submit]\noutputs = [\"/url\"]\n")).unwrap_err();
+        assert!(err.contains("needs `url`"), "{err}");
+        let err = parse(format!("{head}{oauth}[submit]\ntool = \"gen\"\narguments = {{ p = \"{{{{typo}}}}\" }}\noutputs = [\"/u\"]\n")).unwrap_err();
+        assert!(err.contains("`{{typo}}`"), "templates in arguments are linted: {err}");
     }
 
     const MINIMAL: &str = r#"

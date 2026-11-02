@@ -16,11 +16,13 @@ import argparse
 import base64
 import fnmatch
 import glob
+import hashlib
 import itertools
 import json
 import os
 import queue
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -29,9 +31,12 @@ import threading
 import time
 import tomllib
 import traceback
+import urllib.error
+import urllib.request
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qsl, urlsplit
+from urllib.parse import parse_qsl, quote, urlsplit
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PNG = base64.b64decode(
@@ -244,6 +249,420 @@ class Handler(BaseHTTPRequestHandler):
     do_GET = do_POST = do_PUT = do_DELETE = do_PATCH = handle_any
 
 
+# ---------------------------------------------------------------- account stub
+
+ACCOUNT_TOOLS = [
+    {"name": "generate_video", "inputSchema": {
+        "type": "object",
+        "properties": {"params": {"type": "object", "properties": {"model": {"type": "string"}},
+                                  "required": ["model"], "additionalProperties": {}}},
+        "required": ["params"]}},
+    {"name": "generate_image", "inputSchema": {
+        "type": "object",
+        "properties": {"params": {"type": "object", "properties": {"model": {"type": "string"}},
+                                  "required": ["model"], "additionalProperties": {}}},
+        "required": ["params"]}},
+    {"name": "job_status", "inputSchema": {
+        "type": "object",
+        "properties": {"jobId": {"type": "string"}, "sync": {"type": "boolean"}, "raw_data": {"type": "boolean"}},
+        "required": ["jobId"]}},
+    {"name": "media_upload", "inputSchema": {
+        "type": "object",
+        "properties": {"filename": {"type": "string"}, "content_type": {"type": "string"}, "files": {"type": "array"}}}},
+    {"name": "media_confirm", "inputSchema": {
+        "type": "object",
+        "properties": {"media_id": {"type": "string"}, "media_ids": {"type": "array"}, "type": {"type": "string"}},
+        "required": ["type"]}},
+    {"name": "balance", "inputSchema": {"type": "object", "properties": {}}},
+]
+
+ACCOUNT_SCOPES = ["openid", "email", "offline_access"]
+CALLBACK_PORTS = (41687, 53419, 60871)
+
+
+class AccountServer(ThreadingHTTPServer):
+    """An OAuth authorization + resource server and an MCP tool server, for oauth specs."""
+
+    daemon_threads = True
+
+    def __init__(self):
+        super().__init__(("127.0.0.1", 0), AccountHandler)
+        self.base = f"http://127.0.0.1:{self.server_address[1]}"
+        self.lock = threading.Lock()
+        self.registrations = 0
+        self.authorizations = 0
+        self.code_exchanges = 0
+        self.refreshes = 0
+        self.tool_calls = []      # list of (tool name, arguments)
+        self.unexpected = []      # list of strings
+        self._client_id = None
+        self._codes = {}          # code -> {challenge, client_id, redirect_uri, used}
+        self._access = set()      # currently valid access tokens
+        self._refresh = None      # current refresh token
+        self._secrets = []        # every access + refresh token ever issued
+        self._uploads = {}        # media_id -> bytes
+        self._jobs = {}           # job_id -> "video" | "image"
+        self._status_count = {}   # job_id -> job_status calls made
+        self._counter = itertools.count(1)
+        self._session = None
+
+    def _new_token(self, kind):
+        n = next(self._counter)
+        tok = f"emu-{kind}-{n}-{secrets.token_hex(6)}"
+        self._secrets.append(tok)
+        if kind == "at":
+            self._access.add(tok)
+        else:
+            self._refresh = tok
+        return tok
+
+    def revoke_access(self):
+        with self.lock:
+            self._access.clear()
+
+    def assert_no_secrets(self, text):
+        with self.lock:
+            issued = list(self._secrets)
+        for tok in issued:
+            need(tok not in text, "an issued token leaked into output")
+
+
+class AccountHandler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    def log_message(self, *args):
+        pass
+
+    def _body(self):
+        length = int(self.headers.get("content-length") or 0)
+        return self.rfile.read(length) if length else b""
+
+    def send(self, status, body=None, headers=None, content_type="application/json", raw=None):
+        payload = raw if raw is not None else (b"" if body is None else json.dumps(body).encode())
+        self.send_response(status)
+        self.send_header("content-type", content_type)
+        self.send_header("content-length", str(len(payload)))
+        for k, v in (headers or {}).items():
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def do_GET(self):
+        self.route()
+
+    def do_POST(self):
+        self.route()
+
+    def do_PUT(self):
+        self.route()
+
+    def do_DELETE(self):
+        self.route()
+
+    def route(self):
+        server = self.server
+        name = self.path.split("?")[0]
+        if name.startswith("/files/"):
+            raw, mime = (MP4, "video/mp4") if name.endswith(".mp4") else (PNG, "image/png")
+            return self.send(200, raw=raw, content_type=mime)
+        if name.startswith("/.well-known/"):
+            return self.well_known(name)
+        if name == "/oauth/register":
+            return self.register()
+        if name == "/oauth/authorize":
+            return self.authorize()
+        if name == "/oauth/token":
+            return self.token()
+        if name.startswith("/upload/"):
+            return self.upload(name[len("/upload/"):])
+        if name == "/mcp":
+            return self.mcp()
+        with server.lock:
+            server.unexpected.append(f"unrouted {self.command} {self.path}")
+        return self.send(404, {"error": "unrouted"})
+
+    def well_known(self, name):
+        server = self.server
+        B = server.base
+        if name in ("/.well-known/oauth-protected-resource/mcp", "/.well-known/oauth-protected-resource"):
+            return self.send(200, {
+                "resource": B + "/mcp",
+                "authorization_servers": [B],
+                "scopes_supported": ACCOUNT_SCOPES,
+                "bearer_methods_supported": ["header"],
+            })
+        if name in ("/.well-known/oauth-authorization-server", "/.well-known/openid-configuration"):
+            return self.send(200, {
+                "issuer": B,
+                "authorization_endpoint": B + "/oauth/authorize",
+                "token_endpoint": B + "/oauth/token",
+                "registration_endpoint": B + "/oauth/register",
+                "code_challenge_methods_supported": ["S256"],
+                "response_types_supported": ["code"],
+                "grant_types_supported": ["authorization_code", "refresh_token"],
+                "token_endpoint_auth_methods_supported": ["none"],
+                "scopes_supported": ACCOUNT_SCOPES,
+                "authorization_response_iss_parameter_supported": True,
+            })
+        return self.send(404, {"error": "not found"})
+
+    def register(self):
+        server = self.server
+        try:
+            req = json.loads(self._body())
+        except Exception:
+            req = {}
+        want = {f"http://127.0.0.1:{p}/callback" for p in CALLBACK_PORTS}
+        ok = (set(req.get("redirect_uris") or []) == want
+              and req.get("token_endpoint_auth_method") == "none"
+              and "authorization_code" in (req.get("grant_types") or [])
+              and "refresh_token" in (req.get("grant_types") or []))
+        if not ok:
+            with server.lock:
+                server.unexpected.append(f"register rejected: {req}")
+            return self.send(400, {"error": "invalid_client_metadata"})
+        with server.lock:
+            server.registrations += 1
+            server._client_id = f"emu-client-{server.registrations}"
+            client_id = server._client_id
+        return self.send(201, {
+            "client_id": client_id,
+            "client_id_issued_at": int(time.time()),
+            "redirect_uris": sorted(want),
+            "token_endpoint_auth_method": "none",
+            "grant_types": ["authorization_code", "refresh_token"],
+        })
+
+    def authorize(self):
+        server = self.server
+        B = server.base
+        q = dict(parse_qsl(urlsplit(self.path).query))
+        redirect_uri = q.get("redirect_uri", "")
+        scope = set((q.get("scope") or "").split())
+        with server.lock:
+            client_id = server._client_id
+        problems = []
+        if q.get("response_type") != "code":
+            problems.append("response_type")
+        if not client_id or q.get("client_id") != client_id:
+            problems.append("client_id")
+        if redirect_uri not in {f"http://127.0.0.1:{p}/callback" for p in CALLBACK_PORTS}:
+            problems.append("redirect_uri")
+        if q.get("code_challenge_method") != "S256":
+            problems.append("code_challenge_method")
+        if not q.get("code_challenge"):
+            problems.append("code_challenge")
+        if not q.get("state"):
+            problems.append("state")
+        if q.get("resource") != B + "/mcp":
+            problems.append("resource")
+        if not ({"openid", "email", "offline_access"} <= scope):
+            problems.append("scope")
+        if problems:
+            with server.lock:
+                server.unexpected.append(f"authorize invalid ({', '.join(problems)}): {q}")
+            return self.send(400, {"error": "invalid_request", "detail": problems})
+        code = secrets.token_urlsafe(24)
+        with server.lock:
+            server.authorizations += 1
+            server._codes[code] = {"challenge": q["code_challenge"], "client_id": q["client_id"],
+                                   "redirect_uri": redirect_uri, "used": False}
+        location = f"{redirect_uri}?code={code}&state={q['state']}&iss={quote(B, safe='')}"
+        return self.send(302, headers={"Location": location}, content_type="text/plain", raw=b"")
+
+    def token(self):
+        server = self.server
+        B = server.base
+        params = dict(parse_qsl(self._body().decode()))
+        grant = params.get("grant_type")
+        if grant == "authorization_code":
+            code = params.get("code")
+            with server.lock:
+                rec = server._codes.get(code)
+                current_client = server._client_id
+            if (rec is None or rec["used"] or params.get("client_id") != rec["client_id"]
+                    or params.get("redirect_uri") != rec["redirect_uri"]
+                    or params.get("resource") != B + "/mcp"):
+                return self.send(400, {"error": "invalid_grant"})
+            verifier = params.get("code_verifier", "")
+            challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+            if challenge != rec["challenge"]:
+                with server.lock:
+                    server.unexpected.append("token: code_verifier does not match the challenge")
+                return self.send(400, {"error": "invalid_grant"})
+            with server.lock:
+                rec["used"] = True
+                server.code_exchanges += 1
+                access = server._new_token("at")
+                refresh = server._new_token("rt")
+                aud = rec["client_id"]
+            header = base64.urlsafe_b64encode(json.dumps({"alg": "none", "typ": "JWT"}).encode()).rstrip(b"=").decode()
+            payload = base64.urlsafe_b64encode(json.dumps({"iss": B, "aud": aud, "email": "emu@example.com"}).encode()).rstrip(b"=").decode()
+            return self.send(200, {
+                "access_token": access,
+                "token_type": "Bearer",
+                "expires_in": 3600,
+                "refresh_token": refresh,
+                "scope": "openid email offline_access",
+                "id_token": f"{header}.{payload}.",
+            })
+        if grant == "refresh_token":
+            with server.lock:
+                current = server._refresh
+            if not params.get("refresh_token") or params["refresh_token"] != current or "resource" not in params:
+                return self.send(400, {"error": "invalid_grant"})
+            with server.lock:
+                server.refreshes += 1
+                access = server._new_token("at")
+                refresh = server._new_token("rt")
+            return self.send(200, {
+                "access_token": access,
+                "token_type": "Bearer",
+                "expires_in": 3600,
+                "refresh_token": refresh,
+                "scope": "openid email offline_access",
+            })
+        return self.send(400, {"error": "unsupported_grant_type"})
+
+    def upload(self, media_id):
+        with self.server.lock:
+            self.server._uploads[media_id] = self._body()
+        return self.send(200, body={})
+
+    def mcp(self):
+        server = self.server
+        B = server.base
+        if self.command == "GET":
+            return self.send(405, {"error": "method not allowed"})
+        if self.command == "DELETE":
+            return self.send(200, body={})
+        auth = self.headers.get("authorization") or ""
+        token = auth[7:] if auth[:7].lower() == "bearer " else ""
+        with server.lock:
+            ok = token in server._access
+        if not ok:
+            return self.send(401, {"error": "invalid_token"}, headers={
+                "WWW-Authenticate": f'Bearer resource_metadata="{B}/.well-known/oauth-protected-resource/mcp", '
+                                    f'scope="openid email offline_access"'})
+        try:
+            msg = json.loads(self._body())
+        except Exception:
+            with server.lock:
+                server.unexpected.append("mcp: body is not JSON")
+            return self.send(400, {"error": "parse error"})
+        if isinstance(msg, list):
+            out, extra = [], {}
+            for m in msg:
+                if not isinstance(m, dict) or m.get("id") is None:
+                    continue
+                body, hdrs = self.rpc(m)
+                out.append(body)
+                extra.update(hdrs)
+            if not out:
+                return self.send(202, raw=b"")
+            return self.send(200, out, headers=extra)
+        if not isinstance(msg, dict) or msg.get("id") is None:
+            return self.send(202, raw=b"")
+        body, hdrs = self.rpc(msg)
+        return self.send(200, body, headers=hdrs)
+
+    def rpc(self, msg):
+        server = self.server
+        mid = msg.get("id")
+        method = msg.get("method")
+        params = msg.get("params") or {}
+        if method == "initialize":
+            server._session = secrets.token_hex(8)
+            result = {
+                "protocolVersion": params.get("protocolVersion") or "2025-06-18",
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "emu-higgsfield", "version": "1"},
+            }
+            return {"jsonrpc": "2.0", "id": mid, "result": result}, {"Mcp-Session-Id": server._session}
+        if method == "ping":
+            return {"jsonrpc": "2.0", "id": mid, "result": {}}, {}
+        if method == "tools/list":
+            return {"jsonrpc": "2.0", "id": mid, "result": {"tools": ACCOUNT_TOOLS}}, {}
+        if method == "tools/call":
+            return {"jsonrpc": "2.0", "id": mid, "result": self.call_tool(params)}, {}
+        return {"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": f"method not found: {method}"}}, {}
+
+    def call_tool(self, params):
+        server = self.server
+        name = params.get("name")
+        args = params.get("arguments") or {}
+        with server.lock:
+            server.tool_calls.append((name, args))
+        if name == "balance":
+            return {"content": [{"type": "text", "text": json.dumps({"credits": 100})}], "isError": False}
+        structured = None
+        problem = None
+        if name == "generate_video":
+            structured, problem = self.generate(args, "video")
+        elif name == "generate_image":
+            structured, problem = self.generate(args, "image")
+        elif name == "job_status":
+            structured = self.job_status(args)
+        elif name == "media_upload":
+            structured = self.media_upload(args)
+        elif name == "media_confirm":
+            structured = self.media_confirm(args)
+        else:
+            return {"content": [{"type": "text", "text": "unknown tool"}], "isError": True}
+        if problem:
+            return {"content": [{"type": "text", "text": problem}], "isError": True}
+        if structured is None:
+            return {"content": [{"type": "text", "text": "tool failed"}], "isError": True}
+        return {"content": [{"type": "text", "text": json.dumps(structured)}], "structuredContent": structured, "isError": False}
+
+    def generate(self, args, media_type):
+        server = self.server
+        params = args.get("params") or {}
+        model = params.get("model")
+        if not model:
+            return None, "missing params.model"
+        if params.get("use_unlim") is not False:
+            with server.lock:
+                server.unexpected.append(f"{media_type} use_unlim is not false: {params!r}")
+            return None, "use_unlim must be false"
+        job_id = str(uuid.uuid4())
+        with server.lock:
+            server._jobs[job_id] = media_type
+        return {"results": [{"id": job_id, "type": media_type, "status": "pending", "model": model}], "cost": 12}, None
+
+    def job_status(self, args):
+        server = self.server
+        job_id = args.get("jobId")
+        if not job_id:
+            return None
+        with server.lock:
+            n = server._status_count.get(job_id, 0) + 1
+            server._status_count[job_id] = n
+            media_type = server._jobs.get(job_id, "video")
+        if n == 1:
+            return {"generation": {"id": job_id, "status": "in_progress"}}
+        ext = "png" if media_type == "image" else "mp4"
+        return {"generation": {"id": job_id, "status": "completed",
+                               "results": {"rawUrl": f"{server.base}/files/{job_id}.{ext}"}}}
+
+    def media_upload(self, args):
+        server = self.server
+        media_id = str(uuid.uuid4())
+        return {"uploads": [{"upload_url": f"{server.base}/upload/{media_id}", "media_id": media_id, "method": "PUT",
+                             "content_type": args.get("content_type", ""), "instructions": "PUT the bytes"}]}
+
+    def media_confirm(self, args):
+        server = self.server
+        media_id = args.get("media_id")
+        mtype = args.get("type")
+        with server.lock:
+            uploaded = media_id in server._uploads
+        if not uploaded or mtype != "image":
+            with server.lock:
+                server.unexpected.append(f"media_confirm {media_id!r} type={mtype!r} uploaded={uploaded}")
+        return {"results": [{"media_id": media_id, "status": "confirmed", "type": mtype}]}
+
+
 # ---------------------------------------------------------------- MCP client
 
 class ToolError(Exception):
@@ -331,6 +750,13 @@ def env_names(text, spec):
 
 def rewrite(text, base, key):
     return re.sub(r"https?://", f"{base}/h/{key}/", text)
+
+
+def oauth_override(text, base):
+    """An oauth spec pointed at the account stub's MCP endpoint instead of a rewritten host."""
+    url = f"{base}/mcp"
+    text = re.sub(r'^([ \t]*base_url[ \t]*=[ \t]*)"[^"]*"', lambda m: f'{m.group(1)}"{url}"', text, count=1, flags=re.M)
+    return re.sub(r'^([ \t]*resource[ \t]*=[ \t]*)"[^"]*"', lambda m: f'{m.group(1)}"{url}"', text, count=1, flags=re.M)
 
 
 def auth_check_path(key, spec):
@@ -1025,6 +1451,181 @@ class Tour:
 
 # ---------------------------------------------------------------- main
 
+def account_flow(mcp, report, home, bin, stub, key):
+    """The OAuth sign-in, MCP-tool generation and spec-tool-check tour for one account provider."""
+    def check(case, fn):
+        return report.check("account", case, fn)
+
+    env = dict(os.environ, AI_MEDIA_ROUTER_HOME=home)
+
+    def signed_out():
+        p = mcp.call("get_provider", {"provider": key})
+        need(p.get("signed_in") is False, p)
+        need("login higgsfield-account" in (p.get("login_command") or ""), p)
+        t = mcp.call("test_key", {"provider": key})
+        need(t.get("result") == "not_configured", t)
+    check("get_provider signed out", signed_out)
+
+    def refused_signed_out():
+        try:
+            job = mcp.call("generate", {"provider": key, "model": "seedance_2_5", "input": {"prompt": "x"}})
+        except ToolError as e:
+            need("login" in str(e), str(e)[:300])
+            return
+        job = mcp.wait_job(job["id"])
+        need(job["status"] == "failed" and "login" in (job.get("error") or ""), job)
+    check("generate refused signed out", refused_signed_out)
+
+    def run_login():
+        proc = subprocess.Popen([bin, "login", key, "--no-browser", "--store", "file"],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+        url = None
+        try:
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline:
+                line = proc.stdout.readline()
+                if line == "":
+                    break
+                if "Open this URL to sign in:" in line:
+                    url = line.split("Open this URL to sign in:", 1)[1].strip()
+                    break
+            need(url, "no sign-in URL printed")
+            for _ in range(30):
+                try:
+                    with urllib.request.urlopen(url, timeout=30) as resp:
+                        page = resp.read().decode()
+                    break
+                except urllib.error.URLError as e:
+                    if isinstance(e.reason, ConnectionRefusedError):
+                        time.sleep(0.2)
+                        continue
+                    raise
+            else:
+                raise AssertionError(f"sign-in URL never answered: {url}")
+            need("Signed in" in page, page[:500])
+            code = proc.wait(timeout=60)
+            need(code == 0, f"login exited {code}: {proc.stderr.read()[:500]}")
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+
+    def first_login():
+        run_login()
+        need(stub.registrations == 1, f"registrations = {stub.registrations}")
+    check("login (browserless)", first_login)
+
+    def signed_in():
+        time.sleep(3)  # let the server reload config.toml
+        p = mcp.call("get_provider", {"provider": key})
+        need(p.get("signed_in") is True, p)
+        need(p.get("account") == "emu@example.com", p)
+        keys = mcp.call("list_keys")
+        row = next((k for k in keys["keys"] if k["name"] == "HIGGSFIELD_ACCOUNT_SESSION"), None) or {}
+        need(row.get("signed_in") is True, row)
+        need(row.get("masked") is None, row)
+        need("login" in (row.get("set_command") or ""), row)
+    check("signed in after login", signed_in)
+
+    def test_key_accepted():
+        before = len(stub.tool_calls)
+        t = mcp.call("test_key", {"provider": key})
+        need(t.get("result") == "accepted", t)
+        with stub.lock:
+            calls = list(stub.tool_calls[before:])
+        need(any(name == "balance" for name, _ in calls), calls)
+    check("test_key accepted", test_key_accepted)
+
+    def video_generate():
+        before = len(stub.tool_calls)
+        job = mcp.run({"provider": key, "model": "seedance_2_5",
+                       "input": {"prompt": "an emulated paper boat", "duration": 4}})
+        need(job["status"] == "done" and len(job["assets"]) == 1, job)
+        with stub.lock:
+            calls = list(stub.tool_calls[before:])
+        gens = [a for n, a in calls if n == "generate_video"]
+        need(len(gens) == 1, [n for n, _ in calls])
+        params = gens[0].get("params") or {}
+        need(params.get("model") == "seedance_2_5" and params.get("use_unlim") is False
+             and params.get("prompt") == "an emulated paper boat" and params.get("duration") == 4, params)
+        statuses = [a for n, a in calls if n == "job_status"]
+        need(len(statuses) >= 2 and all(a.get("jobId") for a in statuses), statuses)
+        trace = json.dumps(mcp.call("get_job", {"job_id": job["id"], "debug": True}).get("trace"))
+        need("tools/call" in trace, trace[:400])
+        stub.assert_no_secrets(trace)
+    check("video generate via tools", video_generate)
+
+    def upload_and_image():
+        asset = mcp.call("import_asset", {"path": sample(home, "hf-upload.png", "account"), "prompt": "emulated upload"})
+        before = len(stub.tool_calls)
+        job = mcp.run({"provider": key, "model": "image/nano_banana",
+                       "input": {"prompt": "a tiny emulated banana",
+                                 "medias": [{"role": "image", "value": f"{{{{asset:{asset['id']}}}}}"}]}})
+        need(job["status"] == "done", job)
+        with stub.lock:
+            calls = list(stub.tool_calls[before:])
+        uploads = [a for n, a in calls if n == "media_upload"]
+        confirms = [a for n, a in calls if n == "media_confirm"]
+        images = [a for n, a in calls if n == "generate_image"]
+        need(uploads and confirms and images, [n for n, _ in calls])
+        need(confirms[0].get("type") == "image", confirms)
+        media_id = confirms[0].get("media_id")
+        need(media_id, confirms)
+        with stub.lock:
+            put = media_id in stub._uploads
+        need(put, "media bytes were never PUT")
+        params = (images[0].get("params") or {})
+        need(params.get("model") == "nano_banana", params)
+        medias = params.get("medias") or []
+        need(medias and medias[0].get("value") == media_id, medias)
+    check("upload + image generate", upload_and_image)
+
+    def refresh():
+        stub.revoke_access()
+        before = stub.refreshes
+        job = mcp.run({"provider": key, "model": "seedance_2_5",
+                       "input": {"prompt": "after revoke", "duration": 4}})
+        need(job["status"] == "done", job)
+        need(stub.refreshes >= before + 1, f"refreshes = {stub.refreshes}")
+    check("refresh after revoke", refresh)
+
+    def check_spec_tools():
+        spec_text = mcp.call("get_spec", {"provider": key})["text"]
+        c = mcp.call("check_spec", {"provider": key})
+        need(c.get("valid") is True, c)
+        # the fixtures record the real host, not this stub, so cargo test replays them instead
+        need(c.get("tool_problems") == [], c)
+        candidate = spec_text.replace('jobId = "{{id}}"', 'job_id = "{{id}}"')
+        cand = mcp.call("check_spec", {"spec": candidate})
+        probs = cand.get("tool_problems") or []
+        need(any("job_status" in p and ("jobId" in p or "job_id" in p) for p in probs), probs)
+    check("check_spec tool validation", check_spec_tools)
+
+    def logout():
+        proc = subprocess.run([bin, "logout", key], env=env, capture_output=True, text=True, timeout=60)
+        need(proc.returncode == 0, f"logout exited {proc.returncode}: {proc.stderr[:500]}")
+        time.sleep(3)  # let the server reload config.toml
+        p = mcp.call("get_provider", {"provider": key})
+        need(p.get("signed_in") is False, p)
+        try:
+            job = mcp.call("generate", {"provider": key, "model": "seedance_2_5", "input": {"prompt": "x"}})
+        except ToolError as e:
+            need("login" in str(e), str(e)[:300])
+        else:
+            job = mcp.wait_job(job["id"])
+            need(job["status"] == "failed" and "login" in (job.get("error") or ""), job)
+        with open(os.path.join(home, "config.toml"), encoding="utf-8") as f:
+            stub.assert_no_secrets(f.read())
+        stub.assert_no_secrets(b"".join(mcp.stderr).decode(errors="replace"))
+    check("logout removes session", logout)
+
+    def second_login():
+        run_login()
+        need(stub.registrations == 1, f"registrations = {stub.registrations} (client_id should be reused)")
+        proc = subprocess.run([bin, "logout", key], env=env, capture_output=True, text=True, timeout=60)
+        need(proc.returncode == 0, f"logout exited {proc.returncode}: {proc.stderr[:500]}")
+    check("second login reuses client_id", second_login)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     exe = "ai-media-router.exe" if os.name == "nt" else "ai-media-router"
@@ -1036,10 +1637,13 @@ def main():
 
     emu = Emulator()
     threading.Thread(target=emu.serve_forever, daemon=True).start()
+    stub = AccountServer()
+    threading.Thread(target=stub.serve_forever, daemon=True).start()
     home = tempfile.mkdtemp(prefix="ai-media-router-emulate-")
     os.makedirs(os.path.join(home, "providers"))
 
     specs = {}
+    oauth = []
     env = {"EMBEDDINGS_URL": emu.base, "EMBEDDINGS_MODEL": "emu"}
     for path in sorted(glob.glob(os.path.join(ROOT, "providers", "*.toml"))):
         with open(path, encoding="utf-8") as f:
@@ -1049,6 +1653,11 @@ def main():
         if only and key not in only:
             continue
         specs[key] = spec
+        if (spec.get("auth") or {}).get("type") == "oauth":
+            oauth.append(key)
+            with open(os.path.join(home, "providers", f"{key}.toml"), "w", encoding="utf-8", newline="") as f:
+                f.write(oauth_override(text, stub.base))
+            continue
         for name in re.findall(r"\{\{env\.([A-Za-z0-9_]+)\}\}", spec["base_url"]):
             env[name] = f"{emu.base}/h/{key}/{name.lower()}"  # a self-hosted server's address
         for name in env_names(text, spec):
@@ -1069,7 +1678,7 @@ def main():
     try:
         plain = next((k for k, s in sorted(specs.items()) if "auth_check" not in s), None)
         tour = Tour(mcp, emu, report, home, specs.get("kie"), plain)
-        hero = tour.library(set(specs)) if "kie" in specs else None
+        hero = tour.library(set(specs) - set(oauth)) if "kie" in specs else None  # account specs start signed out
 
         def provider(key):
             spec = specs[key]
@@ -1084,7 +1693,7 @@ def main():
                 tour.generations()
 
         # the media tour and the kie tour (queued behind kie's own routes) overlap the other providers
-        tasks = [lambda k=k: provider(k) for k in sorted(specs, key=lambda k: k != "kie")]
+        tasks = [lambda k=k: provider(k) for k in sorted(specs, key=lambda k: k != "kie") if k not in oauth]
         if hero:
             if FFMPEG:
                 tasks.insert(1, tour.media)
@@ -1095,14 +1704,19 @@ def main():
                 f.result()
         if hero:
             tour.finish(hero)
+        for key in oauth:
+            account_flow(mcp, report, home, os.path.abspath(args.bin), stub, key)
     except Exception:  # noqa: BLE001
         report.add("harness", "crashed", False, traceback.format_exc())
     finally:
         mcp.close()
         emu.shutdown()
+        stub.shutdown()
 
     for line in emu.unexpected:
         report.add("emulator", "unexpected request", False, line)
+    for line in stub.unexpected:
+        report.add("account", "unexpected request", False, line)
     failed = [r for r in report.rows if not r[2]]
     print(f"\n{len(report.rows) - len(failed)} passed, {len(failed)} failed")
     for area, case, _, detail in failed:

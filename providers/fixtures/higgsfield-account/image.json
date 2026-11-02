@@ -1,0 +1,103 @@
+{
+  "source": "Answer shapes from the Jutsu Studio app's live MCP tool snapshot (2026-10-28); ids and URLs made up.",
+  "model": "image/nano_banana",
+  "input": {
+    "prompt": "a red fox in fresh snow",
+    "aspect_ratio": "1:1"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://mcp.higgsfield.ai/mcp",
+        "body": {
+          "jsonrpc": "2.0",
+          "method": "tools/call",
+          "params": {
+            "name": "generate_image",
+            "arguments": {
+              "params": {
+                "model": "nano_banana",
+                "use_unlim": false,
+                "prompt": "a red fox in fresh snow",
+                "aspect_ratio": "1:1"
+              }
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"results\": [{\"id\": \"9b2e4f70-1c3d-4a5b-8e6f-7a8b9c0d1e2f\", \"type\": \"image\", \"status\": \"pending\", \"model\": \"nano_banana\"}]}"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "results": [
+                {
+                  "id": "9b2e4f70-1c3d-4a5b-8e6f-7a8b9c0d1e2f",
+                  "type": "image",
+                  "status": "pending",
+                  "model": "nano_banana"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "POST",
+        "url": "https://mcp.higgsfield.ai/mcp",
+        "body": {
+          "jsonrpc": "2.0",
+          "method": "tools/call",
+          "params": {
+            "name": "job_status",
+            "arguments": {
+              "jobId": "9b2e4f70-1c3d-4a5b-8e6f-7a8b9c0d1e2f"
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"generation\": {\"id\": \"9b2e4f70-1c3d-4a5b-8e6f-7a8b9c0d1e2f\", \"status\": \"completed\", \"results\": {\"rawUrl\": \"https://cdn.higgsfield.test/jobs/9b2e4f70-1c3d-4a5b-8e6f-7a8b9c0d1e2f/image.png\"}}}"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "generation": {
+                "id": "9b2e4f70-1c3d-4a5b-8e6f-7a8b9c0d1e2f",
+                "status": "completed",
+                "results": {
+                  "rawUrl": "https://cdn.higgsfield.test/jobs/9b2e4f70-1c3d-4a5b-8e6f-7a8b9c0d1e2f/image.png"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://cdn.higgsfield.test/jobs/9b2e4f70-1c3d-4a5b-8e6f-7a8b9c0d1e2f/image.png"
+    ]
+  }
+}

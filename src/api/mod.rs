@@ -590,6 +590,8 @@ pub struct SpecCheck {
     /// Rendered requests, credentials shown as `<ENV_NAME>`; only when `model` is given.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub requests: Vec<Exchange>,
+    /// MCP tool steps whose `arguments` do not fit the live server's tools; checked only when signed in.
+    pub tool_problems: Vec<String>,
     pub hint: String,
 }
 
@@ -1421,6 +1423,7 @@ pub async fn check_spec(app: &App, p: CheckSpecParams) -> Result<SpecCheck> {
                 error: Some(format!("{e:#}")),
                 fixtures: Vec::new(),
                 requests: Vec::new(),
+                tool_problems: Vec::new(),
                 hint: "Fix the error and call check_spec again; docs/provider-spec.md describes every field.".into(),
             });
         }
@@ -1435,7 +1438,7 @@ pub async fn check_spec(app: &App, p: CheckSpecParams) -> Result<SpecCheck> {
         None => Vec::new(),
     };
     let failed = results.iter().filter(|r| !r.ok).count();
-    let hint = if failed > 0 {
+    let mut hint = if failed > 0 {
         format!(
             "{failed} fixture(s) fail: the spec no longer matches the recorded responses. If the provider's API \
              changed, update the fixture too (repo providers/fixtures/{0}/ or <home>/providers/fixtures/{0}/).",
@@ -1450,7 +1453,22 @@ pub async fn check_spec(app: &App, p: CheckSpecParams) -> Result<SpecCheck> {
     } else {
         "Valid and every fixture passes. save_spec activates it immediately.".into()
     };
-    Ok(SpecCheck { key: Some(spec.key), valid: true, error: None, fixtures: results, requests, hint })
+    let mut tool_problems = Vec::new();
+    if !spec.tool_steps().is_empty() {
+        let provider = Provider::new(spec.clone(), Origin::Candidate, app.env(), app.http.clone(), app.home.clone());
+        if provider.configured() {
+            match provider.tool_problems().await {
+                Ok(found) => tool_problems = found,
+                Err(e) => tool_problems.push(format!("cannot list the MCP server's tools: {}", provider.redact(&format!("{e:#}")))),
+            }
+            if !tool_problems.is_empty() {
+                hint.push_str(" Fix the tool steps named in tool_problems so their arguments match the server's inputSchema.");
+            }
+        } else {
+            hint.push_str(&format!(" Sign in with `ai-media-router login {}` to check its tools against the live server.", spec.key));
+        }
+    }
+    Ok(SpecCheck { key: Some(spec.key), valid: true, error: None, fixtures: results, requests, tool_problems, hint })
 }
 
 pub async fn save_spec(app: &App, p: SaveSpecParams) -> Result<SpecSaved> {

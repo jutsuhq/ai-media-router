@@ -16,6 +16,10 @@ local library with its prompt, cost and lineage. The MCP tools and the CLI do th
    masked tail. When one is missing, give the user its `set_command` (`ai-media-router keys set FAL_KEY`)
    to run in their terminal; never ask for a key value in the chat. Keys apply without a restart.
    `test_key {provider}` makes a free auth check where the spec has one.
+   An account provider (`higgsfield-account`: the user's Higgsfield account, paid in credits) has no key:
+   `get_provider` shows `signed_in`, `account` and the `login_command` (`ai-media-router login
+   higgsfield-account`) for the user to run in their terminal; a browser opens to sign in. You never
+   see or pass a token. `logout` signs out.
 3. `list_providers` shows which providers are configured.
 
 ## Generate one thing
@@ -41,9 +45,12 @@ local library with its prompt, cost and lineage. The MCP tools and the CLI do th
 
 - **Money.** For paid runs pass `offer_id`, so the job carries an estimate. When the user names a limit,
   `set_budget {name, limit_usd}` once, then pass `budget` on every job; over-limit jobs are refused before submit.
+  Budgets count USD: a job on a provider billed in credits (`higgsfield-account`) counts its
+  `estimated_cost_usd`, because credits are never converted.
 - **Failures.** A failed job has `error_kind`, `retryable` and a `hint`. Follow the hint. Never resubmit
   `moderation`, `auth`, `quota` or `invalid_input` unchanged. On `auth`, call `list_keys` and give the user
-  the `set_command` to run in their terminal; never ask for a key value in the chat.
+  the `set_command` to run in their terminal (for an account provider it is the `login` command); never ask
+  for a key value in the chat.
 - **Flaky providers.** `retry: {attempts: 1-5, delay_secs}` on generate, run_recipe or batch defaults resubmits
   after `rate_limit`, `provider_error`, `network` or `timeout`. It is off by default because a provider may bill
   a failed attempt, so turn it on for cheap or unattended runs.
@@ -112,4 +119,4 @@ A budget admits the whole batch at once. Follow it with `get_batch {batch_id, wa
 `generate --provider … --model … --input '{…}' [--dry-run] [--retry 2] [--reuse] --wait`,
 `jobs [id] --wait`, `batch @spec.json --wait`, `recipes save <name> --provider … --model … --input '{…}' [--offer …] [--budget …]`,
 `recipes run <name> --vars '{…}'` (`recipes check` dry-runs it),
-`keys set|list|test|remove`. Every command has `--help`.
+`keys set|list|test|remove`, `login <provider> [--no-browser]`, `logout <provider>`. Every command has `--help`.

@@ -1,6 +1,9 @@
 //! Runs a provider spec: submit → poll → result → outputs, plus reference uploads and dry runs.
 
-use std::collections::{BTreeMap, VecDeque};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    sync::Arc,
+};
 
 use anyhow::{Context, Result, anyhow, bail};
 use base64::{Engine, engine::general_purpose::STANDARD};
@@ -8,13 +11,19 @@ use reqwest::{
     Method, Url,
     multipart::{Form, Part},
 };
+use rmcp::{
+    RoleClient, ServiceExt,
+    model::CallToolRequestParams,
+    service::{RunningService, ServiceError},
+    transport::{AuthClient, StreamableHttpClientTransport, streamable_http_client::StreamableHttpClientTransportConfig},
+};
 use serde_json::{Map, Value, json};
 
 use super::{
     Origin,
     auth::Authenticator,
     exchange::{Doc, Exchange, Payload, Request, Response, Trace, Transport, replay},
-    spec::{AuthKind, Spec, Step, UploadKind},
+    spec::{AuthKind, Spec, Step, Upload, UploadKind},
     template::{Ctx, Mode, REPLAY_UUID, as_number, as_text, render_str, render_value},
 };
 use crate::config::Env;
@@ -59,7 +68,11 @@ pub struct Provider {
     env: Env,
     transport: Transport,
     home: std::path::PathBuf,
+    /// The MCP session for tool steps, opened on first use and dropped on a transport error.
+    mcp: tokio::sync::Mutex<Option<Arc<McpClient>>>,
 }
+
+type McpClient = RunningService<RoleClient, ()>;
 
 impl Provider {
     pub fn new(spec: Spec, origin: Origin, env: Env, http: reqwest::Client, home: std::path::PathBuf) -> Self {
@@ -75,7 +88,7 @@ impl Provider {
         let auth = Authenticator::new(spec.auth.clone(), env.clone());
         let route_auth =
             spec.routes.iter().map(|r| r.auth.clone().map(|a| Authenticator::new(a, env.clone()))).collect();
-        Self { spec, origin, auth, route_auth, env, transport, home }
+        Self { spec, origin, auth, route_auth, env, transport, home, mcp: Default::default() }
     }
 
     /// Env vars still to set. Empty when the top-level auth or any route's auth is complete.
@@ -124,6 +137,9 @@ impl Provider {
         let auth = self.authenticator(steps.route);
         let mut missing = auth.missing();
         missing.extend(self.missing_base_env());
+        if self.mode() == Mode::Live && !missing.is_empty() && self.spec.auth.kind == AuthKind::Oauth {
+            bail!("{}: not signed in: run `ai-media-router login {}`", self.spec.key, self.spec.key);
+        }
         if self.mode() == Mode::Live && !missing.is_empty() {
             bail!(
                 "{}: model `{model}` uses credentials {}; set them in the environment or config.toml [env]",
@@ -324,29 +340,17 @@ impl Provider {
         vars.insert("uuid".into(), json!(uuid::Uuid::new_v4().to_string()));
         vars.insert("file_name".into(), json!(file_name));
         vars.insert("mime".into(), json!(mime));
+        vars.insert("media_type".into(), json!(mime.split('/').next().unwrap_or_default()));
         vars.insert("base64".into(), Value::String(base64));
         vars.insert("data_uri".into(), Value::String(data_uri));
         vars.insert("size_bytes".into(), json!(bytes.len()));
         let at = self.at("upload");
         let ctx = self.ctx(&vars, &Value::Null, self.mode());
-        let url = self.url(upload.url.as_deref().unwrap_or_default(), &ctx)?;
-        let mut headers = self.headers(&Step::default(), &ctx)?;
-        let method = method_name(upload.method.as_deref(), "POST");
         let file_field = upload.file_field.as_deref().unwrap_or("file");
-        let (body, payload) = if upload.kind == UploadKind::Multipart {
-            let mut fields = Map::new();
-            for (k, v) in &upload.fields {
-                fields.insert(k.clone(), json!(render_str(v, &ctx).with_context(|| format!("{at}: rendering fields.{k}"))?));
-            }
-            headers.insert("content-type".into(), "multipart/form-data".into());
-            multipart(fields, file_field, file_name, mime, std::mem::take(&mut bytes))
-        } else {
-            let body = render_value(upload.body.as_ref().unwrap_or(&json!({})), &ctx)
-                .with_context(|| format!("{at}: rendering body"))?;
-            headers.insert("content-type".into(), "application/json".into());
-            (Some(body), Payload::Json)
+        let req = match &upload.tool {
+            Some(tool) => self.tool_request("upload", tool, upload.arguments.as_ref(), &ctx)?,
+            None => self.upload_request(upload, &ctx, file_name, mime, &mut bytes)?,
         };
-        let req = Request { method, url, headers, body, payload, auth: true };
         let doc = self.round_trip("upload", &self.auth, req, true, trace).await?;
 
         if !matches!(upload.kind, UploadKind::Put | UploadKind::PostForm) {
@@ -387,6 +391,29 @@ impl Provider {
         }
     }
 
+    /// The `[upload]` HTTP request; a multipart upload takes the file bytes.
+    fn upload_request(&self, upload: &Upload, ctx: &Ctx, file_name: &str, mime: &str, bytes: &mut Vec<u8>) -> Result<Request> {
+        let at = self.at("upload");
+        let url = self.url(upload.url.as_deref().unwrap_or_default(), ctx)?;
+        let mut headers = self.headers(&Step::default(), ctx)?;
+        let method = method_name(upload.method.as_deref(), "POST");
+        let (body, payload) = if upload.kind == UploadKind::Multipart {
+            let mut fields = Map::new();
+            for (k, v) in &upload.fields {
+                fields.insert(k.clone(), json!(render_str(v, ctx).with_context(|| format!("{at}: rendering fields.{k}"))?));
+            }
+            headers.insert("content-type".into(), "multipart/form-data".into());
+            let file_field = upload.file_field.as_deref().unwrap_or("file");
+            multipart(fields, file_field, file_name, mime, std::mem::take(bytes))
+        } else {
+            let body = render_value(upload.body.as_ref().unwrap_or(&json!({})), ctx)
+                .with_context(|| format!("{at}: rendering body"))?;
+            headers.insert("content-type".into(), "application/json".into());
+            (Some(body), Payload::Json)
+        };
+        Ok(Request { method, url, headers, body, payload, auth: true })
+    }
+
     /// GET for an output file, authenticated when the spec says files need the API key.
     pub async fn download(&self, url: &str, auth: bool) -> Result<reqwest::Response> {
         let Transport::Http(http) = &self.transport else { bail!("downloads are not replayed") };
@@ -415,6 +442,9 @@ impl Provider {
 
     /// Renders a step into the exact request that will be sent (minus credentials).
     fn prepare(&self, name: &str, step: &Step, default: &str, ctx: &Ctx) -> Result<Request> {
+        if let Some(tool) = &step.tool {
+            return self.tool_request(name, tool, step.arguments.as_ref(), ctx);
+        }
         let at = self.at(name);
         let url = self.url(&step.url, ctx).with_context(|| format!("{at}: rendering url"))?;
         let mut headers = self.headers(step, ctx).with_context(|| format!("{at}: rendering headers"))?;
@@ -434,6 +464,71 @@ impl Provider {
         Ok(Request { method: method_name(step.method.as_deref(), default), url, headers, body, payload, auth: true })
     }
 
+    /// A tool step as a JSON-RPC `tools/call` to `base_url`, so traces and fixtures keep one shape.
+    fn tool_request(&self, name: &str, tool: &str, arguments: Option<&Value>, ctx: &Ctx) -> Result<Request> {
+        let at = self.at(name);
+        let arguments =
+            render_value(arguments.unwrap_or(&json!({})), ctx).with_context(|| format!("{at}: rendering arguments"))?;
+        let url = render_str(&self.spec.base_url, ctx).with_context(|| format!("{at}: rendering base_url"))?;
+        let body = json!({ "jsonrpc": "2.0", "method": "tools/call", "params": { "name": tool, "arguments": arguments } });
+        Ok(Request { method: "POST".into(), url, headers: BTreeMap::new(), body: Some(body), payload: Payload::Tool, auth: true })
+    }
+
+    /// The MCP client for `uri`, opened as the signed-in account on first use.
+    async fn mcp_client(&self, uri: &str) -> Result<Arc<McpClient>> {
+        let mut slot = self.mcp.lock().await;
+        if let Some(client) = slot.as_ref() {
+            return Ok(client.clone());
+        }
+        let Transport::Http(http) = &self.transport else { bail!("tool calls are only sent live") };
+        let manager = super::oauth::manager(&self.home, &self.spec.key, &self.spec.auth, uri).await?;
+        let transport = StreamableHttpClientTransport::with_client(
+            AuthClient::new(http.clone(), manager),
+            StreamableHttpClientTransportConfig::with_uri(uri.to_owned()),
+        );
+        let client = Arc::new(().serve(transport).await.map_err(|e| self.mcp_failure(uri, &e))?);
+        *slot = Some(client.clone());
+        Ok(client)
+    }
+
+    /// Sends a `Payload::Tool` request; an MCP error comes back as a JSON-RPC `error` body.
+    async fn send_tool(&self, req: &Request) -> Result<Response> {
+        let params = req.body.as_ref().map(|b| &b["params"]).unwrap_or(&Value::Null);
+        let name = params["name"].as_str().unwrap_or_default().to_owned();
+        let arguments = params["arguments"].as_object().cloned().unwrap_or_default();
+        let client = self.mcp_client(&req.url).await?;
+        let body = match client.call_tool(CallToolRequestParams::new(name).with_arguments(arguments)).await {
+            Ok(result) => json!({ "jsonrpc": "2.0", "result": result }),
+            Err(ServiceError::McpError(error)) => json!({ "jsonrpc": "2.0", "error": error }),
+            Err(e) => {
+                *self.mcp.lock().await = None;
+                return Err(self.mcp_failure(&req.url, &e));
+            }
+        };
+        Ok(Response { status: 200, headers: BTreeMap::new(), text: body.to_string(), json: Some(body) })
+    }
+
+    /// rmcp reports a missing or rejected session in several shapes; all of them mean "sign in again".
+    fn mcp_failure(&self, uri: &str, e: &(impl std::fmt::Display + std::fmt::Debug)) -> anyhow::Error {
+        let text = format!("{e} {e:?}").to_lowercase();
+        let signed_out = ["authorization required", "auth required", "authrequired", "refresh token was rejected", "tokenrefreshrejected"];
+        if signed_out.iter().any(|m| text.contains(m)) {
+            anyhow!("not signed in or the session expired: run `ai-media-router login {}`", self.spec.key)
+        } else {
+            anyhow!("MCP server {uri}: {e}")
+        }
+    }
+
+    /// For each tool step: the tool is on the live server and its `arguments` match the tool's
+    /// `inputSchema` (required and declared top-level names).
+    pub async fn tool_problems(&self) -> Result<Vec<String>> {
+        let uri = render_str(&self.spec.base_url, &self.ctx(&Map::new(), &Value::Null, Mode::Live))?;
+        let client = self.mcp_client(&uri).await?;
+        let tools = client.list_all_tools().await.map_err(|e| self.mcp_failure(&uri, &e))?;
+        let schemas = tools.iter().map(|t| (t.name.to_string(), Value::Object((*t.input_schema).clone()))).collect();
+        Ok(tool_problems(&self.spec.tool_steps(), &schemas))
+    }
+
     fn headers(&self, step: &Step, ctx: &Ctx) -> Result<BTreeMap<String, String>> {
         self.spec
             .headers
@@ -446,12 +541,18 @@ impl Provider {
     /// Sends (or replays) one request, records it in the trace and checks the response.
     async fn round_trip(&self, step: &str, auth: &Authenticator, req: Request, json_required: bool, trace: &mut Trace) -> Result<Doc> {
         let record = req.record(auth.placeholders());
+        let tool = matches!(req.payload, Payload::Tool).then(|| as_text(&record.body.as_ref().unwrap_or(&Value::Null)["params"]["name"]));
         let result = match &self.transport {
+            Transport::Http(_) if tool.is_some() => self.send_tool(&req).await,
             Transport::Http(http) => send(http, auth, req).await,
             Transport::Replay(queue) => replay(queue, step, &record),
         };
         trace.push(Exchange::new(step, record, result.as_ref().map_err(|e| format!("{e:#}"))));
-        self.check(result.with_context(|| self.at(step))?, json_required).with_context(|| self.at(step))
+        let doc = self.check(result.with_context(|| self.at(step))?, json_required).with_context(|| self.at(step))?;
+        match tool {
+            Some(tool) => tool_doc(doc, &tool).map_err(|e| anyhow!("{}: {}", self.at(step), self.hinted(e))),
+            None => Ok(doc),
+        }
     }
 
     /// HTTP status, JSON parsing and the spec's `[errors]` block.
@@ -572,6 +673,7 @@ async fn send(http: &reqwest::Client, auth: &Authenticator, req: Request) -> Res
         Payload::Json => builder.body(serde_json::to_vec(&body)?),
         Payload::Form => builder.form(&body),
         Payload::Bytes(bytes) => builder.body(bytes),
+        Payload::Tool => bail!("an MCP tool call is not an HTTP request"),
         Payload::FormData => {
             let mut form = Form::new();
             for (k, v) in body.as_object().into_iter().flatten() {
@@ -616,6 +718,55 @@ fn multipart(mut fields: Map<String, Value>, field: &str, file_name: &str, mime:
     fields.insert(field.to_owned(), json!(format!("<file {file_name}, {mime}, {} bytes>", bytes.len())));
     let payload = Payload::Multipart { file_field: field.to_owned(), file_name: file_name.to_owned(), mime: mime.to_owned(), bytes };
     (Some(Value::Object(fields)), payload)
+}
+
+/// A `tools/call` response as the doc the step's pointers read: `structuredContent`, else the
+/// first text block parsed as JSON, else that text. A JSON-RPC error or `isError` fails the step.
+fn tool_doc(doc: Doc, tool: &str) -> Result<Doc, String> {
+    let Doc { body, headers } = doc;
+    if let Some(error) = body.get("error") {
+        return Err(format!("tool `{tool}` returned JSON-RPC error {}: {}", as_text(&error["code"]), as_text(&error["message"])));
+    }
+    let result = &body["result"];
+    let text = result["content"].as_array().into_iter().flatten().find(|c| c["type"] == "text").and_then(|c| c["text"].as_str());
+    if result["isError"] == true {
+        return Err(format!("tool `{tool}` failed: {}", truncate(text.unwrap_or("no message"))));
+    }
+    let body = match (result.get("structuredContent").filter(|v| !v.is_null()), text) {
+        (Some(structured), _) => structured.clone(),
+        (None, Some(text)) => serde_json::from_str(text).unwrap_or_else(|_| json!(text)),
+        (None, None) => Value::Null,
+    };
+    Ok(Doc { body, headers })
+}
+
+/// What `check_spec` reports for tool steps whose `arguments` do not fit the server's tools.
+fn tool_problems(steps: &[(String, &str, Option<&Value>)], schemas: &BTreeMap<String, Value>) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (table, tool, arguments) in steps {
+        let Some(schema) = schemas.get(*tool) else {
+            let names: Vec<&str> = schemas.keys().map(String::as_str).take(20).collect();
+            problems.push(format!("[{table}] tool `{tool}` is not on the server; it has: {}", names.join(", ")));
+            continue;
+        };
+        let sent: Vec<&str> =
+            arguments.and_then(|a| a.as_object()).into_iter().flat_map(|a| a.keys()).map(String::as_str).filter(|k| *k != "$merge").collect();
+        for required in schema["required"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+            if !sent.contains(&required) {
+                problems.push(format!("[{table}] tool `{tool}`: its inputSchema requires `{required}`, which [{table}].arguments does not send"));
+            }
+        }
+        if let Some(declared) = schema["properties"].as_object().filter(|p| !p.is_empty()) {
+            let names: Vec<&str> = declared.keys().map(String::as_str).collect();
+            for name in sent.iter().filter(|n| !declared.contains_key(**n)) {
+                problems.push(format!(
+                    "[{table}] tool `{tool}`: [{table}].arguments sends `{name}`, which its inputSchema does not declare (it has: {})",
+                    names.join(", ")
+                ));
+            }
+        }
+    }
+    problems
 }
 
 fn pointed(doc: &Doc, pointer: &str, at: &str, what: &str) -> Result<Value> {
@@ -879,6 +1030,41 @@ outputs = ["/out"]
         let vars = p.submit("sync/img", &json!({ "prompt": "cat" }), &mut trace).await.unwrap();
         let TaskState::Done { outputs, .. } = p.poll(&vars, &mut trace).await.unwrap() else { panic!("expected done") };
         assert!(matches!(&outputs[..], [Output::Inline { data, mime: Some(m) }] if data == b"hi" && m == "image/png"));
+    }
+
+    #[test]
+    fn tool_doc_reads_structured_content_then_text() {
+        let doc = |body: Value| Doc { body, headers: BTreeMap::new() };
+        let text = |t: &str| json!([{ "type": "text", "text": t }]);
+        let structured = json!({ "result": { "content": text("{\"a\":0}"), "structuredContent": { "a": 1 } } });
+        assert_eq!(tool_doc(doc(structured), "t").unwrap().body, json!({ "a": 1 }));
+        let only_text = json!({ "result": { "content": text("{\"a\":2}") } });
+        assert_eq!(tool_doc(doc(only_text), "t").unwrap().body, json!({ "a": 2 }));
+        let plain = json!({ "result": { "content": text("queued") } });
+        assert_eq!(tool_doc(doc(plain), "t").unwrap().body, json!("queued"));
+        let failed = json!({ "result": { "content": text("model is required"), "isError": true } });
+        assert_eq!(tool_doc(doc(failed), "gen").err().unwrap(), "tool `gen` failed: model is required");
+        let rpc = json!({ "error": { "code": -32602, "message": "Unknown tool" } });
+        assert_eq!(tool_doc(doc(rpc), "gen").err().unwrap(), "tool `gen` returned JSON-RPC error -32602: Unknown tool");
+    }
+
+    #[test]
+    fn tool_problems_compare_arguments_with_input_schema() {
+        let schemas = BTreeMap::from([(
+            "job_status".to_owned(),
+            json!({ "type": "object", "properties": { "jobId": {}, "raw_data": {} }, "required": ["jobId"] }),
+        )]);
+        let good = json!({ "jobId": "{{id}}" });
+        let wrong = json!({ "job_id": "{{id}}" });
+        assert!(tool_problems(&[("poll".into(), "job_status", Some(&good))], &schemas).is_empty());
+        assert_eq!(
+            tool_problems(&[("poll".into(), "job_status", Some(&wrong)), ("submit".into(), "gen", None)], &schemas),
+            [
+                "[poll] tool `job_status`: its inputSchema requires `jobId`, which [poll].arguments does not send",
+                "[poll] tool `job_status`: [poll].arguments sends `job_id`, which its inputSchema does not declare (it has: jobId, raw_data)",
+                "[submit] tool `gen` is not on the server; it has: job_status",
+            ]
+        );
     }
 
     #[test]

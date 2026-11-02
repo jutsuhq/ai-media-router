@@ -7,6 +7,21 @@ between minor versions; an older library is refused with a message rather than m
 
 ## [Unreleased]
 
+### Added
+
+- Account sign-in: `ai-media-router login <provider>` and `logout <provider>` for specs with
+  `[auth] type = "oauth"` (OAuth 2.1 with PKCE, discovery and client registration, a loopback callback).
+  The session is stored like a key and refreshes itself; `list_keys` and `get_provider` show `signed_in`,
+  `account` and the `login` command, and no tool takes a token.
+- Spec steps that call a tool on a remote MCP server (`tool` + `arguments`) in `[submit]`, `[poll]`,
+  `[auth_check]` and `[upload]`; `check_spec` reports `tool_problems` against the live tools when signed in.
+- A built-in `higgsfield-account` provider: Higgsfield's MCP server with the signed-in account, paid in credits.
+
+### Fixed
+
+- A macOS keychain write longer than `security -i` accepts is refused with a `--store file` hint instead
+  of storing a truncated value.
+
 ## [0.1.0] - 2026-11-01
 
 First public release.

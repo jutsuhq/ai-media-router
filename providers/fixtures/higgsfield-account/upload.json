@@ -1,0 +1,113 @@
+{
+  "source": "Answer shapes from the Jutsu Studio app's live MCP tool snapshot (2026-10-28); ids and URLs made up.",
+  "upload": {
+    "file_name": "ref.png",
+    "mime": "image/png"
+  },
+  "exchanges": [
+    {
+      "step": "upload",
+      "request": {
+        "method": "POST",
+        "url": "https://mcp.higgsfield.ai/mcp",
+        "body": {
+          "jsonrpc": "2.0",
+          "method": "tools/call",
+          "params": {
+            "name": "media_upload",
+            "arguments": {
+              "filename": "ref.png",
+              "content_type": "image/png"
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"uploads\": [{\"upload_url\": \"https://uploads.higgsfield.test/media_5e1f0a2b3c4d?X-Amz-Signature=made-up\", \"media_id\": \"media_5e1f0a2b3c4d\", \"method\": \"PUT\", \"content_type\": \"image/png\", \"instructions\": \"PUT the file bytes to upload_url, then call media_confirm.\"}]}"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "uploads": [
+                {
+                  "upload_url": "https://uploads.higgsfield.test/media_5e1f0a2b3c4d?X-Amz-Signature=made-up",
+                  "media_id": "media_5e1f0a2b3c4d",
+                  "method": "PUT",
+                  "content_type": "image/png",
+                  "instructions": "PUT the file bytes to upload_url, then call media_confirm."
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "step": "upload_put",
+      "request": {
+        "method": "PUT",
+        "url": "https://uploads.higgsfield.test/media_5e1f0a2b3c4d?X-Amz-Signature=made-up",
+        "headers": {
+          "content-type": "image/png"
+        },
+        "body": "<7 bytes>"
+      },
+      "response": {
+        "status": 200,
+        "body": ""
+      }
+    },
+    {
+      "step": "upload_complete",
+      "request": {
+        "method": "POST",
+        "url": "https://mcp.higgsfield.ai/mcp",
+        "body": {
+          "jsonrpc": "2.0",
+          "method": "tools/call",
+          "params": {
+            "name": "media_confirm",
+            "arguments": {
+              "media_id": "media_5e1f0a2b3c4d",
+              "type": "image"
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"results\": [{\"media_id\": \"media_5e1f0a2b3c4d\", \"status\": \"confirmed\", \"type\": \"image\"}]}"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "results": [
+                {
+                  "media_id": "media_5e1f0a2b3c4d",
+                  "status": "confirmed",
+                  "type": "image"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "reference": "media_5e1f0a2b3c4d"
+  }
+}

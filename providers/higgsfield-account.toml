@@ -1,0 +1,53 @@
+key = "higgsfield-account"
+name = "Higgsfield (account sign-in)"
+catalog = []
+docs = "https://higgsfield.ai"
+model_hint = "Sign in first: `ai-media-router login higgsfield-account` (a browser opens; the account's credits pay). Video model ids, e.g. `seedance_2_5`, go to the `generate_video` tool; prefix image models with `image/`, e.g. `image/nano_banana`. `input` is the tool's `params` object (prompt, aspect_ratio, duration, count, resolution, medias…); `model` and `use_unlim = false` are filled in."
+base_url = "https://mcp.higgsfield.ai/mcp"
+cost_unit = "credits"
+notes = "Talks to Higgsfield's MCP server as the signed-in account (OAuth), not the REST API: generations spend the account's credits (a `budget` counts the job's `estimated_cost_usd`; credits are not converted), and the `higgsfield` provider (API key pair, USD) is separate. Reference files: upload_asset, then put the returned id into `input.medias` as {role, value}; the role depends on the model (e.g. `image`, `image_references`, `start_image`)."
+
+[example]
+model = "seedance_2_5"
+input = { prompt = "a paper boat drifting on a calm lake", duration = 4, aspect_ratio = "9:16" }
+
+[auth]
+type = "oauth"
+env = ["HIGGSFIELD_ACCOUNT_SESSION"]
+scope = "openid email offline_access"
+
+[auth_check]
+tool = "balance"
+
+[submit]
+tool = "generate_video"
+arguments = { params = { model = "{{model}}", use_unlim = false, "$merge" = "{{input}}" } }
+capture = { id = "/results/0/id" }
+
+[poll]
+tool = "job_status"
+arguments = { jobId = "{{id}}" }
+status = "/generation/status"
+success = ["completed"]
+failure = ["failed", "nsfw", "canceled", "ip_detected"]
+error = ["/generation/error", "/error"]
+outputs = ["/generation/results/rawUrl"]
+
+[[route]]
+models = ["image/*"]
+strip_prefix = "image/"
+[route.submit]
+tool = "generate_image"
+arguments = { params = { model = "{{model}}", use_unlim = false, "$merge" = "{{input}}" } }
+capture = { id = "/results/0/id" }
+
+[upload]
+type = "put"
+tool = "media_upload"
+arguments = { filename = "{{file_name}}", content_type = "{{mime}}" }
+capture = { upload_url = "/uploads/0/upload_url", media_id = "/uploads/0/media_id" }
+result = "/results/0/media_id"
+usage = "Put the id into input.medias as {\"role\": \"image\", \"value\": \"<id>\"}; the role depends on the model."
+[upload.complete]
+tool = "media_confirm"
+arguments = { media_id = "{{media_id}}", type = "{{media_type}}" }
