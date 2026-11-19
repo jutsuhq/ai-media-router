@@ -7,7 +7,7 @@
 </h1>
 
 <p align="center">
-  <strong>One MCP server for AI image and video generation across 40+ providers, with your own keys and a local library that remembers everything.</strong>
+  <strong>An open-source MCP server for AI video generation and images across 40+ providers, with your own keys and a local library that remembers everything.</strong>
 </p>
 
 <p align="center">
