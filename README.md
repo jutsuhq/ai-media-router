@@ -17,7 +17,7 @@
   <a href="https://modelcontextprotocol.io"><img alt="MCP server" src="https://img.shields.io/badge/MCP-server-14B8A6.svg"></a>
 </p>
 
-AI Media Router is an open-source MCP server that lets Claude, Cursor, Codex or any MCP client generate images and videos with Seedance, Kling, Veo, Wan, FLUX, GPT Image, Nano Banana, Seedream and more, through 43 providers: fal, Replicate, kie, Runware, WaveSpeed, OpenRouter, BytePlus and 35 others, or your own ComfyUI server. The agent compares prices across providers before it spends, pays each one with your own key, and gets every result back as a local file it can search, review, reuse as a reference and chain into the next shot. Self-hosted, a single Rust binary, MIT.
+AI Media Router is an open-source MCP server that lets Claude, Cursor, Codex or any MCP client generate images and videos with Seedance, Kling, Veo, Wan, FLUX, GPT Image, Nano Banana, Seedream and more, through 43 providers: fal, Replicate, kie, Runware, WaveSpeed, OpenRouter, BytePlus and 35 others, or your own ComfyUI server. The agent compares prices across providers before it spends, pays each one with your own key, and gets every result back as a local file it can search, review, reuse as a reference and chain into the next shot. Self-hosted, a single Rust binary, MIT. Website and provider price comparison: [jutsustudio.com/ai-media-router](https://jutsustudio.com/ai-media-router/).
 
 For example, on November 1, 2026 the price catalog listed Seedance 2.5 text-to-video at 720p with audio from $0.216 a second (302.AI) to $0.462 (fal) among the providers the router can call: the same 10-second clip for $2.16 or $4.62. `search_prices` shows the agent that spread before it picks.
 
