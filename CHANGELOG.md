@@ -16,6 +16,8 @@ between minor versions; an older library is refused with a message rather than m
 - Spec steps that call a tool on a remote MCP server (`tool` + `arguments`) in `[submit]`, `[poll]`,
   `[auth_check]` and `[upload]`; `check_spec` reports `tool_problems` against the live tools when signed in.
 - A built-in `higgsfield-account` provider: Higgsfield's MCP server with the signed-in account, paid in credits.
+- A built-in `anex` provider: anex.sh's MiniMax-compatible task API for video (text, first and last frame,
+  reference to video and video editing) and an `upscale:` route that takes a finished clip to 2K or 4K.
 
 ### Fixed
 

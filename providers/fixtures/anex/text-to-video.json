@@ -1,0 +1,133 @@
+{
+  "source": "Recorded from the live API on 2026-11-25 (job trace); task ids replaced and the signed clip URL replaced by a placeholder. One poll per status is kept.",
+  "model": "MiniMax-H3",
+  "input": {
+    "content": [
+      {
+        "type": "text",
+        "text": "A red fox trots across fresh snow at dawn, its breath steaming."
+      }
+    ],
+    "resolution": "768P",
+    "duration": 4,
+    "ratio": "16:9"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://tasks.anex.sh/v2/video_generation",
+        "headers": {
+          "authorization": "Bearer <ANEX_API_KEY>"
+        },
+        "body": {
+          "content": [
+            {
+              "type": "text",
+              "text": "A red fox trots across fresh snow at dawn, its breath steaming."
+            }
+          ],
+          "resolution": "768P",
+          "duration": 4,
+          "ratio": "16:9",
+          "model": "MiniMax-H3"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task_id": "318407566120873452"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://tasks.anex.sh/v2/query/video_generation/318407566120873452"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task": {
+            "created_at": 1795624715,
+            "duration": 4,
+            "id": "318407566120873452",
+            "modality": "video",
+            "model": "MiniMax-H3",
+            "ratio": "16:9",
+            "resolution": "768P",
+            "task_type": "generation",
+            "status": "queued",
+            "updated_at": 1795624715,
+            "usage": {}
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://tasks.anex.sh/v2/query/video_generation/318407566120873452"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task": {
+            "created_at": 1795624715,
+            "duration": 4,
+            "id": "318407566120873452",
+            "modality": "video",
+            "model": "MiniMax-H3",
+            "ratio": "16:9",
+            "resolution": "768P",
+            "task_type": "generation",
+            "status": "running",
+            "updated_at": 1795626416,
+            "usage": {}
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://tasks.anex.sh/v2/query/video_generation/318407566120873452"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task": {
+            "created_at": 1795624715,
+            "duration": 4,
+            "id": "318407566120873452",
+            "modality": "video",
+            "model": "MiniMax-H3",
+            "ratio": "16:9",
+            "resolution": "768P",
+            "task_type": "generation",
+            "content": {
+              "url": "https://storage.example/job/318407566120873452/video.mp4?X-Amz-Expires=3600&X-Amz-Signature=redacted"
+            },
+            "status": "succeeded",
+            "updated_at": 1795626818,
+            "usage": {
+              "input_image_count": 0,
+              "input_seconds": 0,
+              "output_seconds": 4,
+              "total_seconds": 4
+            }
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://storage.example/job/318407566120873452/video.mp4?X-Amz-Expires=3600&X-Amz-Signature=redacted"
+    ]
+  }
+}
