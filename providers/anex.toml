@@ -1,0 +1,84 @@
+key = "anex"
+name = "anex.sh (video)"
+catalog = ["anex.sh"]
+docs = "https://anex.sh/docs/video"
+model_hint = "MiniMax-style model name from anex.sh/docs/video-models, e.g. `MiniMax-H3` or `FastH3-8-Step-V2`; the JSON catalog at https://anex.sh/api/estimate/catalog lists the current names (`video.names`), kinds, resolutions and prices. `input` is the rest of the POST /v2/video_generation body: `content` (one `{type: \"text\", text}` item plus optional `image_url` / `audio_url` / `video_url` items with a `role`), `resolution` (e.g. `768P`), `duration` in seconds, optional `ratio` and `seed`. Prefix `upscale:` (e.g. `upscale:MiniMax-H3`) upscales a finished clip: `input` is `resolution` (`2K` or `4K`) plus `source_task_id` or a `content` with one `video_url` item in role `base_video`."
+base_url = "https://tasks.anex.sh"
+notes = """
+MiniMax-compatible task API: POST /v2/video_generation -> GET /v2/query/video_generation/{task_id}
+(status queued/running/succeeded/failed/cancelled) -> the mp4 at `task.content.url`, signed for one
+hour on every read. There is no files API and no `mm_file://` id: media goes in as an https URL or a
+data URI (request body up to 64 MB), so local files are sent as data URIs.
+Models come in kinds: text to video, first and last frame, reference to video and video editing,
+and faster distilled variants of those. One name can serve several kinds, picked by the `content`
+you send. The lineup, each model's kinds, resolutions, clip lengths, media counts and seed support,
+and the prices per second are not repeated here because they change: read
+https://anex.sh/docs/video-models and https://anex.sh/docs/video-pricing, or the key-less JSON at
+https://anex.sh/api/estimate/catalog (entries with `task` `generate_video` or `upscale_video`: names
+in `video.names`, kinds in `video.kinds`, USD prices in `media_fees`).
+Clips are 24 fps with sound. `resolution` is `768P`, `2K` or `4K` where the model offers it: 2K and
+4K are the 768P render upscaled, not a larger render. `4K` is anex.sh's addition to MiniMax's values.
+Media items in `content`: `image_url` with role `first_frame`, `last_frame` or `reference_image`,
+`audio_url` with role `reference_audio`, `video_url` with role `reference_video` (video editing).
+Frames and references never mix in one request. `ratio` is 21:9, 16:9, 4:3, 1:1, 3:4 or 9:16; a
+frame sets it, and with references the default is `adaptive`.
+Upscale (`upscale:<name>`, POST /v2/video_regeneration): `source_task_id` takes a task made at 768P
+(its id is `task_id` in the submit response, shown by `get_job {debug: true}`); otherwise send your
+own clip as a `base_video` item.
+Failed, refused and cancelled-while-queued requests cost nothing. A task reports billed seconds in
+`task.usage`, not an amount, so jobs carry no `cost`.
+A 429 means the organization has too many requests in flight. Every request is screened against
+the model licence's use rules: a refusal is a 422, or a failed task with code
+`content_policy_violation`.
+Organizations with EU data residency use https://tasks-eu.anex.sh (the main host answers 421 naming
+it); US-only routing is https://tasks-us.anex.sh. Override `base_url` in this file to use one.
+Not mapped: the presigned upload (POST https://api.anex.sh/batch/v1/inputs, referenced as
+`input:<id>`), callbacks, and the fal-compatible queue at https://queue.run.anex.sh, which serves the
+same models but has no upscale call.
+A task can stay `queued` for tens of minutes while capacity starts,
+and an upscale waits separately: keep polling the same job and do not submit it again.
+Checked against the live API on 2026-11-25: the key check, a MiniMax-H3 text to video clip at 768P,
+its 2K upscale by `source_task_id`, and the 401 and 400 error bodies. Reference to video, frames,
+distilled variants, 4K and a failed task's `error` follow the docs and were not run.
+"""
+
+[example]
+model = "MiniMax-H3"
+input = { content = [{ type = "text", text = "A red fox trots across fresh snow at dawn, its breath steaming." }], resolution = "768P", duration = 6, ratio = "16:9" }
+
+[auth]
+type = "bearer"
+env = ["ANEX_API_KEY"]
+
+[auth_check]
+url = "/v2/query/video_generation?page_size=1"
+
+[errors]
+message = "/error/message"
+
+[errors.kinds]
+moderation = ["content_policy_violation"]
+
+[submit]
+url = "/v2/video_generation"
+body = { "$merge" = "{{input}}", model = "{{model}}" }
+capture = { id = "/task_id" }
+
+[poll]
+url = "/v2/query/video_generation/{{id}}"
+status = "/task/status"
+success = ["succeeded"]
+failure = ["failed", "cancelled"]
+error = ["/task/error/message", "/task/error/code"]
+outputs = ["/task/content/url"]
+
+[[route]]
+strip_prefix = "upscale:"
+models = ["upscale:*"]
+[route.submit]
+url = "/v2/video_regeneration"
+body = { "$merge" = "{{input}}", model = "{{model}}" }
+capture = { id = "/task_id" }
+
+[upload]
+type = "data_uri"

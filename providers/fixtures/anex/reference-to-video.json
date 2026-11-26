@@ -1,0 +1,97 @@
+{
+  "source": "Not recorded: the request follows the anex.sh video docs (a reference_image item on the 4-step Ref2VA model, delivered at 2K) and the task object follows the shape recorded for text-to-video on 2026-11-25.",
+  "model": "MiniMax-H3-Ref2VA-SMD-4step",
+  "input": {
+    "content": [
+      {
+        "type": "text",
+        "text": "The woman from the reference image walks through a night market in the rain."
+      },
+      {
+        "type": "image_url",
+        "image_url": {
+          "url": "https://example.com/woman.png"
+        },
+        "role": "reference_image"
+      }
+    ],
+    "resolution": "2K",
+    "duration": 5,
+    "seed": 42
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://tasks.anex.sh/v2/video_generation",
+        "headers": {
+          "authorization": "Bearer <ANEX_API_KEY>"
+        },
+        "body": {
+          "content": [
+            {
+              "type": "text",
+              "text": "The woman from the reference image walks through a night market in the rain."
+            },
+            {
+              "type": "image_url",
+              "image_url": {
+                "url": "https://example.com/woman.png"
+              },
+              "role": "reference_image"
+            }
+          ],
+          "resolution": "2K",
+          "duration": 5,
+          "seed": 42,
+          "model": "MiniMax-H3-Ref2VA-SMD-4step"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task_id": "318407566120873977"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://tasks.anex.sh/v2/query/video_generation/318407566120873977"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task": {
+            "content": {
+              "url": "https://storage.example/job/318407566120873977/video.mp4?X-Amz-Expires=3600&X-Amz-Signature=redacted"
+            },
+            "created_at": 1795630000,
+            "duration": 5,
+            "id": "318407566120873977",
+            "modality": "video",
+            "model": "MiniMax-H3-Ref2VA-SMD-4step",
+            "ratio": "16:9",
+            "resolution": "2K",
+            "status": "succeeded",
+            "task_type": "generation",
+            "updated_at": 1795630095,
+            "usage": {
+              "input_image_count": 1,
+              "input_seconds": 0,
+              "output_seconds": 5,
+              "total_seconds": 5
+            }
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://storage.example/job/318407566120873977/video.mp4?X-Amz-Expires=3600&X-Amz-Signature=redacted"
+    ]
+  }
+}

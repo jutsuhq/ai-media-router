@@ -17,7 +17,7 @@
   <a href="https://modelcontextprotocol.io"><img alt="MCP server" src="https://img.shields.io/badge/MCP-server-14B8A6.svg"></a>
 </p>
 
-AI Media Router is an open-source MCP server that lets Claude, Cursor, Codex or any MCP client generate images and videos with Seedance, Kling, Veo, Wan, FLUX, GPT Image, Nano Banana, Seedream and more, through 43 providers: fal, Replicate, kie, Runware, WaveSpeed, OpenRouter, BytePlus and 35 others, or your own ComfyUI server. The agent compares prices across providers before it spends, pays each one with your own key, and gets every result back as a local file it can search, review, reuse as a reference and chain into the next shot. Self-hosted, a single Rust binary, MIT. Website and provider price comparison: [jutsustudio.com/ai-media-router](https://jutsustudio.com/ai-media-router/).
+AI Media Router is an open-source MCP server that lets Claude, Cursor, Codex or any MCP client generate images and videos with Seedance, Kling, Veo, Wan, FLUX, GPT Image, Nano Banana, Seedream and more, through 44 providers: fal, Replicate, kie, Runware, WaveSpeed, OpenRouter, BytePlus and 35 others, or your own ComfyUI server. The agent compares prices across providers before it spends, pays each one with your own key, and gets every result back as a local file it can search, review, reuse as a reference and chain into the next shot. Self-hosted, a single Rust binary, MIT. Website and provider price comparison: [jutsustudio.com/ai-media-router](https://jutsustudio.com/ai-media-router/).
 
 For example, on November 1, 2026 the price catalog listed Seedance 2.5 text-to-video at 720p with audio from $0.216 a second (302.AI) to $0.462 (fal) among the providers the router can call: the same 10-second clip for $2.16 or $4.62. `search_prices` shows the agent that spread before it picks.
 
@@ -51,7 +51,7 @@ For example, on November 1, 2026 the price catalog listed Seedance 2.5 text-to-v
 
 | Without it | With AI Media Router |
 |---|---|
-| Every provider has its own API, auth, polling and output format | One `generate` → `get_job` loop for all 43; providers are TOML files |
+| Every provider has its own API, auth, polling and output format | One `generate` → `get_job` loop for all 44; providers are TOML files |
 | Result URLs expire after hours or days | Every output is downloaded at once, content-hashed, indexed, previewed |
 | The agent forgets what it made last week | Full-text and similarity search, history, lineage graph, per-model stats |
 | A character or product drifts between shots | Named references fed into every generation with `{{ref:name}}` |
@@ -62,11 +62,11 @@ Principles: bring your own keys (no middleman account), the agent chooses provid
 
 ## Supported providers
 
-44 built-in provider specs (Higgsfield has two), each a TOML file in [`providers/`](providers) with recorded fixtures. `ai-media-router providers` lists them with the env vars each one still needs.
+45 built-in provider specs (Higgsfield has two), each a TOML file in [`providers/`](providers) with recorded fixtures. `ai-media-router providers` lists them with the env vars each one still needs.
 
 | Kind | Providers (key) |
 |---|---|
-| Inference platforms and API aggregators | fal.ai (`fal`), Replicate (`replicate`), Runware (`runware`), WaveSpeedAI (`wavespeed`), kie.ai (`kie`), OpenRouter (`openrouter`), Vercel AI Gateway (`vercel`), Together AI (`together`), DeepInfra (`deepinfra`), Novita AI (`novita`), SiliconFlow (`siliconflow`), Segmind (`segmind`), Atlas Cloud (`atlascloud`), each::labs (`eachlabs`), AI/ML API (`aimlapi`), 302.AI (`ai302`), APIMart (`apimart`), CometAPI (`cometapi`), EvoLink (`evolink`), PiAPI (`piapi`), ModelsLab (`modelslab`), Makernice (`makernice`), Pollo AI (`pollo`), Sume (`sume`), Unifically (`unifically`), Yir (`yir`), Higgsfield (`higgsfield`; `higgsfield-account` signs in to the account and pays in credits), Comfy Router partner models (`comfy`) |
+| Inference platforms and API aggregators | fal.ai (`fal`), Replicate (`replicate`), Runware (`runware`), WaveSpeedAI (`wavespeed`), kie.ai (`kie`), OpenRouter (`openrouter`), Vercel AI Gateway (`vercel`), Together AI (`together`), DeepInfra (`deepinfra`), Novita AI (`novita`), SiliconFlow (`siliconflow`), Segmind (`segmind`), Atlas Cloud (`atlascloud`), each::labs (`eachlabs`), AI/ML API (`aimlapi`), 302.AI (`ai302`), APIMart (`apimart`), CometAPI (`cometapi`), EvoLink (`evolink`), PiAPI (`piapi`), ModelsLab (`modelslab`), Makernice (`makernice`), Pollo AI (`pollo`), Sume (`sume`), Unifically (`unifically`), Yir (`yir`), anex.sh (`anex`), Higgsfield (`higgsfield`; `higgsfield-account` signs in to the account and pays in credits), Comfy Router partner models (`comfy`) |
 | Model makers' own APIs | BytePlus ModelArk (`byteplus`) and Volcengine Ark (`volcengine`) for Seedance and Seedream, Kling (`kling`), Gemini API (`gemini`) for Veo and Nano Banana, Google Vertex AI (`vertex`) for Veo, Imagen and Nano Banana, Alibaba Cloud Model Studio (`alibaba`, `alibaba-cn`) for Wan, MiniMax Hailuo (`minimax`), Runway (`runway`), Luma (`luma`), LTX (`ltx`), PixVerse (`pixverse`), Vidu (`vidu`), xAI Grok Imagine (`xai`) |
 | Self-hosted | ComfyUI (`comfyui`): your own server or a rented GPU, any workflow in API format, 0 USD per job |
 
@@ -76,7 +76,7 @@ Models are not a fixed list: `model` goes to the provider as written, so a model
 
 | | One provider's own MCP server (for example fal's or Replicate's) | A local ComfyUI | AI Media Router |
 |---|---|---|---|
-| Providers | That one | Models you run yourself | 43 providers, plus your ComfyUI as one of them |
+| Providers | That one | Models you run yourself | 44 providers, plus your ComfyUI as one of them |
 | Price comparison | Its own prices | Free per job, your GPU | Catalog prices across providers, before the agent picks |
 | Spending limit | Whatever that provider offers | Not needed | Named USD budgets that refuse a job before it is sent |
 | Where results end up | That provider's storage or URLs | Your ComfyUI output folder | A local library: search, ratings, references, lineage |
@@ -648,7 +648,7 @@ flowchart TB
     subgraph engine["providers/ (engine)"]
         registry["mod.rs<br/>built-ins + overrides, hot reload"]
         run["engine.rs<br/>prepare → submit → poll → result"]
-        specs[/"providers/*.toml<br/>43 specs + fixtures"/]
+        specs[/"providers/*.toml<br/>45 specs + fixtures"/]
     end
     api --> core
     api --> library
@@ -723,7 +723,7 @@ No. `search_prices` lists offers cheapest first, and the agent or you choose. Th
 Any model a supported provider serves, for example Seedance, Kling, Veo, Wan, Hailuo, Runway, Luma, LTX, FLUX, GPT Image, Nano Banana, Imagen and Seedream. `model` and `input` pass through unchanged.
 
 **Is it a fal MCP or Replicate MCP alternative?**
-It covers fal and Replicate as two of its 43 providers, behind one set of tools, with price comparison, budgets and a local library on top. Use a provider's own MCP server if you only ever use that provider.
+It covers fal and Replicate as two of its 44 providers, behind one set of tools, with price comparison, budgets and a local library on top. Use a provider's own MCP server if you only ever use that provider.
 
 **Is it like OpenRouter for images and video?**
 In the sense of one interface over many providers, yes. Unlike OpenRouter it runs on your machine and has no account or balance: each provider bills you directly. OpenRouter is one of the providers it can call.

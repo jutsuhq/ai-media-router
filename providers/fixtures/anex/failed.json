@@ -1,0 +1,88 @@
+{
+  "source": "Not recorded (no task failed during the live check): per the anex.sh video docs a task that fails after it was accepted carries error.code and error.message naming the file and the limit. The message text is invented; the other fields follow the recorded task shape.",
+  "model": "MiniMax-H3",
+  "input": {
+    "content": [
+      {
+        "type": "text",
+        "text": "The person in the photo waves."
+      },
+      {
+        "type": "image_url",
+        "image_url": {
+          "url": "https://example.com/huge.png"
+        },
+        "role": "first_frame"
+      }
+    ],
+    "resolution": "768P",
+    "duration": 5
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://tasks.anex.sh/v2/video_generation",
+        "headers": {
+          "authorization": "Bearer <ANEX_API_KEY>"
+        },
+        "body": {
+          "content": [
+            {
+              "type": "text",
+              "text": "The person in the photo waves."
+            },
+            {
+              "type": "image_url",
+              "image_url": {
+                "url": "https://example.com/huge.png"
+              },
+              "role": "first_frame"
+            }
+          ],
+          "resolution": "768P",
+          "duration": 5,
+          "model": "MiniMax-H3"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task_id": "318407566120875220"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://tasks.anex.sh/v2/query/video_generation/318407566120875220"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task": {
+            "created_at": 1795631000,
+            "duration": 5,
+            "error": {
+              "code": "media_too_large",
+              "message": "content[1] image is 41.2 MB; the limit is 30 MB"
+            },
+            "id": "318407566120875220",
+            "modality": "video",
+            "model": "MiniMax-H3",
+            "resolution": "768P",
+            "status": "failed",
+            "task_type": "generation",
+            "updated_at": 1795631004,
+            "usage": {}
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "error": "content[1] image is 41.2 MB; the limit is 30 MB; media_too_large"
+  }
+}

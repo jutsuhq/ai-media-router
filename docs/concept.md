@@ -61,7 +61,7 @@ flowchart LR
 
 ## 1. Generation gateway
 
-One job API over 43 provider specs, one of them a self-hosted ComfyUI server
+One job API over 45 provider specs, one of them a self-hosted ComfyUI server
 (`comfyui`: the workflow in API format is the input, every job costs 0 USD).
 
 - **Jobs.** `generate` submits and returns a job at once. A worker polls by lease,

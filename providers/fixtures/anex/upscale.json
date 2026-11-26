@@ -1,0 +1,93 @@
+{
+  "source": "Recorded from the live API on 2026-11-25 (job trace); task ids replaced and the signed clip URL replaced by a placeholder. The 2K upscale of the text-to-video fixture's task, by source_task_id.",
+  "model": "upscale:MiniMax-H3",
+  "input": {
+    "resolution": "2K",
+    "source_task_id": "318407566120873452"
+  },
+  "exchanges": [
+    {
+      "step": "submit",
+      "request": {
+        "method": "POST",
+        "url": "https://tasks.anex.sh/v2/video_regeneration",
+        "headers": {
+          "authorization": "Bearer <ANEX_API_KEY>"
+        },
+        "body": {
+          "resolution": "2K",
+          "source_task_id": "318407566120873452",
+          "model": "MiniMax-H3"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task_id": "318407566120874107"
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://tasks.anex.sh/v2/query/video_generation/318407566120874107"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task": {
+            "created_at": 1795626843,
+            "duration": 4,
+            "id": "318407566120874107",
+            "modality": "video",
+            "model": "MiniMax-H3",
+            "ratio": "16:9",
+            "resolution": "2K",
+            "task_type": "regeneration",
+            "status": "queued",
+            "updated_at": 1795626843,
+            "usage": {}
+          }
+        }
+      }
+    },
+    {
+      "step": "poll",
+      "request": {
+        "method": "GET",
+        "url": "https://tasks.anex.sh/v2/query/video_generation/318407566120874107"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "task": {
+            "created_at": 1795626843,
+            "duration": 4,
+            "id": "318407566120874107",
+            "modality": "video",
+            "model": "MiniMax-H3",
+            "ratio": "16:9",
+            "resolution": "2K",
+            "task_type": "regeneration",
+            "content": {
+              "url": "https://storage.example/job/318407566120874107/video.mp4?X-Amz-Expires=3600&X-Amz-Signature=redacted"
+            },
+            "status": "succeeded",
+            "updated_at": 1795627814,
+            "usage": {
+              "input_seconds": 0,
+              "output_seconds": 4,
+              "total_seconds": 4
+            }
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "outputs": [
+      "https://storage.example/job/318407566120874107/video.mp4?X-Amz-Expires=3600&X-Amz-Signature=redacted"
+    ]
+  }
+}
